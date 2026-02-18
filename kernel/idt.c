@@ -3,6 +3,7 @@
 void panic(const char* msg);
 void vga_write(const char* s);
 void vga_write_u32(u32 value);
+void vga_write_hex(u32 value);
 
 struct idt_entry {
     u16 offset_low;
@@ -92,6 +93,16 @@ void idt_init(void) {
     lidt(idt, sizeof(idt) - 1U);
 }
 
+static void dump_page_fault(struct regs* r) {
+    vga_write("Page fault addr=");
+    vga_write_hex(read_cr2());
+    vga_write(" err=");
+    vga_write_hex(r->err_code);
+    vga_write(" eip=");
+    vga_write_hex(r->eip);
+    vga_write("\n");
+}
+
 void isr_dispatch(struct regs* r) {
     if (r->int_no < 32U) {
         vga_write("\n[EXCEPTION] #");
@@ -99,6 +110,9 @@ void isr_dispatch(struct regs* r) {
         vga_write(": ");
         vga_write(exception_messages[r->int_no]);
         vga_write("\n");
+        if (r->int_no == 14U) {
+            dump_page_fault(r);
+        }
         panic("Unhandled CPU exception");
     }
 

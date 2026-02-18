@@ -20,7 +20,14 @@ KERNEL_C_SRCS := \
 	kernel/idt.c \
 	kernel/timer.c \
 	kernel/vga.c \
-	kernel/panic.c
+	kernel/panic.c \
+	kernel/mem/mem.c \
+	kernel/mem/e820.c \
+	kernel/mem/pmm.c \
+	kernel/mem/paging.c \
+	kernel/mem/vmm.c \
+	kernel/mem/heap.c \
+	kernel/mem/mem_debug.c
 
 KERNEL_ASM_SRCS := \
 	kernel/entry.asm \
@@ -35,7 +42,7 @@ build: $(IMAGE)
 
 $(IMAGE): $(BOOT_BIN) $(KERNEL_BIN)
 	mkdir -p $(BUILD_DIR)
-	dd if=/dev/zero of=$(IMAGE) bs=512 count=2880 status=none
+	dd if=/dev/zero of=$(IMAGE) bs=512 count=4096 status=none
 	dd if=$(BOOT_BIN) of=$(IMAGE) conv=notrunc status=none
 	dd if=$(KERNEL_BIN) of=$(IMAGE) bs=512 seek=1 conv=notrunc status=none
 
