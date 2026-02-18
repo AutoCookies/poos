@@ -28,5 +28,6 @@ int proc_exec_path_current(const char* path) {
     if (proc_load_elf_from_path(t->owner, path, &entry, &esp) < 0) return -1;
     t->tf.eip = entry;
     t->tf.useresp = esp;
+    t->owner->image_path = path;
     return 0;
 }

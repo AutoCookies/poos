@@ -19,7 +19,8 @@ void faults_handle_page_fault(struct trapframe* tf) {
         struct task* t = task_current();
         vga_write(" pid="); vga_write_u32(t && t->owner ? t->owner->pid : 0U);
         vga_write(" [user]\n");
-        proc_kill_current(-1);
+        proc_send_signal(t && t->owner ? t->owner->pid : 0U, SIGSEGV);
+        proc_kill_current(-11);
         return;
     }
     vga_write(" [kernel]\n");

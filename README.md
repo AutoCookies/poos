@@ -1,71 +1,87 @@
-# PoOS v0.5
+# PoOS v0.6
 
-PoOS v0.5 extends v0.4 with a scalable virtual filesystem substrate, initrd/tarfs root mount, path-based program execution, and a minimal userland init/shell toolchain.
+PoOS v0.6 adds Unix-like process control + IPC on top of the v0.5 VFS/initrd base: `fork`, `waitpid`, `pipe`, `dup2`, interactive TTY input, basic signal defaults, and writable `/tmp` via memfs.
 
-## Architecture overview
+## Process model
 
-### VFS core (`kernel/vfs/`)
-- `vnode`: filesystem object abstraction (regular file, directory, device)
-- `file`: open-file state (offset/flags/vnode ref)
-- `fdtable`: per-process fixed descriptor table (`FD_MAX=64`)
-- `mount`: minimal mount table with root mount plus extra mountpoints (`/dev`)
-- `path`: absolute path traversal with component parsing and mount crossing
+- `fork()` clones the current process and its user address space (full page copy, no COW yet).
+- Parent receives child PID, child resumes at the same user PC with return value `0`.
+- Child inherits open file descriptors by refcounted `file` objects.
+- `execve()` replaces current user image.
+- States: `RUNNING`, `ZOMBIE`, `DEAD`.
+- Parent/child links (`parent`, `ppid`) are tracked in `struct proc`.
 
-The design is intentionally small but structured so additional filesystems (FAT/ext2) can register vnode ops and mount roots without changing syscall logic.
+## waitpid semantics
 
-### Filesystems (`kernel/fs/`)
-- `tarfs`: read-only root filesystem backed by initrd ustar archive
-- `devfs`: minimal device nodes:
-  - `/dev/console` (write)
-  - `/dev/null` (discard writes, EOF on read)
-- `initrd`: boot-time initrd region registration from `BootInfo`
+- `waitpid(pid, status, flags)` supports:
+  - `pid > 0`: specific child
+  - `pid <= 0`: any child
+- If matching zombie exists, returns immediately and reaps.
+- If caller has no matching children, returns `-ECHILD` equivalent (`-10`).
+- Blocking waits sleep/yield in scheduler loops (no IRQ busy-spin).
+- `WNOHANG`-style behavior is wired through `flags & 1`.
 
-## Boot/initrd pipeline
-1. Bootloader loads kernel and fixed-size initrd region from disk.
-2. Bootloader passes initrd physical start/size in `BootInfo`.
-3. Kernel initializes VFS and mounts tarfs at `/`.
-4. Kernel mounts devfs at `/dev`.
-5. Kernel spawns `/sbin/init` by path.
+## IPC: pipes + descriptor control
 
-`user/pack/mkinitrd.sh` builds a ustar archive from `user/pack/rootfs`.
+- `pipe(fds)` creates read/write file descriptors backed by a ring buffer.
+- Semantics:
+  - read blocks while empty and writers remain
+  - read returns `0` on EOF when last writer closes
+  - write returns `-EPIPE` when no readers exist
+- `dup2(oldfd, newfd)` implemented with correct close/rebind behavior.
+- FD lifecycle uses file refcounts and close callbacks for pipe endpoint release.
 
-## Process/runtime model
-- Kernel launches PID 1 from `/sbin/init`.
-- `init` respawns `/bin/sh` and reaps children with `waitpid`.
-- Shell supports basic builtins and external command launch by path/
-  `/bin/<cmd>` resolution.
-- Zombie processes transition to dead state and are cleaned by the reaper path.
+## Signals (minimal defaults)
 
-## Syscall ABI (`int 0x80`)
-Numbers:
-1. `write(fd, buf, len)`
-2. `exit(code)`
-3. `yield()`
-4. `sleep(ms)`
-5. `getpid()`
-6. `open(path, flags)`
-7. `close(fd)`
-8. `read(fd, buf, len)`
-9. `lseek(fd, off, whence)`
-10. `stat(path, st)`
-11. `getdents(fd, dirent, len)`
-12. `execve(path)`
-13. `waitpid(pid, status)`
-14. `spawn(path)` (minimal helper for v0.5 process launch)
+Implemented default-only model (no user-installed handlers yet):
+- `SIGCHLD`: parent pending bit set when child exits.
+- `SIGKILL`: pending kill terminates process.
+- `SIGSEGV`: user page fault terminates faulting process.
+- `kill(pid, sig)` supports basic delivery by PID.
 
-All user pointers are copied via usercopy helpers.
+Limitations:
+- No custom signal handlers.
+- No process groups/job control signals yet.
 
-## Rootfs contents
-Packed into initrd tar:
-- `/sbin/init`
-- `/bin/sh`
-- `/bin/ls`
-- `/bin/cat`
-- `/bin/hello`
-- `/etc/motd`
+## TTY + console input
 
-## Add a new user program
-1. Add `user/apps/<prog>.c`
-2. Add `<prog>` to `USER_APPS` in `Makefile`
-3. Copy resulting ELF into `user/pack/rootfs` in `$(INITRD_TAR)` rule
-4. Rebuild (`make build`) and boot (`make run`)
+- Added `/dev/tty` line-buffered input path.
+- Keyboard IRQ1 (`kbd.c`) translates basic set-1 scancodes to ASCII.
+- `read(0, ...)` from tty returns on newline.
+- Minimal line editing: backspace supported.
+- Console output remains VGA text mode.
+
+## Writable `/tmp` (memfs)
+
+- Mounted memfs at `/tmp`.
+- Flat namespace under `/tmp` (no nested directories).
+- Supports open/create/truncate/read/write for small regular files.
+- Max file size: 64 KiB per file.
+
+## Shell v0.6
+
+`/bin/sh` now runs interactively from TTY and uses fork/exec/wait.
+Supported forms:
+- `echo hi`
+- `echo hi > /tmp/out`
+- `cat /tmp/out`
+- `cmd1 | cmd2`
+- `hello &`
+- external `/bin/<name>` execution
+
+## Syscall ABI additions
+
+- `fork()`
+- `pipe(int fds[2])`
+- `dup2(oldfd, newfd)`
+- `kill(pid, sig)`
+
+Legacy v0.5 syscalls remain available (`open/read/write/execve/waitpid/spawn/...`).
+
+## Known limitations / future work
+
+- No copy-on-write fork yet (full-copy clone only).
+- No full POSIX wait status encoding.
+- No termios, canonical/raw mode control.
+- Pipe blocking currently scheduler-sleep based (simple, not full wait queues).
+- No advanced shell parser (single pipeline segment, simple redirections).

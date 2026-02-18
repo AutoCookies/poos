@@ -1,3 +1,4 @@
+#include "../fs/memfs.h"
 #include "vfs.h"
 #include "mount.h"
 #include "path.h"
@@ -7,7 +8,9 @@ int vfs_mount(const char* path, struct vnode* root) { return mount_attach(path, 
 
 int vfs_open(const char* path, u32 flags, struct file** out) {
     struct vnode* vn = 0;
-    if (vfs_resolve(path, &vn) < 0) return -1;
+    if (vfs_resolve(path, &vn) < 0) {
+        if (memfs_open_flat(path, flags, &vn) < 0) return -1;
+    }
     struct file* f = file_create(vn, flags);
     vnode_put(vn);
     if (!f) return -1;
