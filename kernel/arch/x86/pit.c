@@ -3,7 +3,7 @@
 #include "../../time/time.h"
 #include "../../sched/sched.h"
 
-static void pit_timer_irq(struct regs* r) {
+static void pit_timer_irq(regs_t* r) {
     (void)r;
     time_tick();
     sched_on_tick_wake();

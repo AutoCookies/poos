@@ -112,3 +112,23 @@ bool vmm_map_range(u32 virt_addr, u32 phys_addr, u32 size, u32 flags) {
     }
     return true;
 }
+
+bool vmm_map_page_in(u32 cr3_phys, u32 virt_addr, u32 phys_addr, u32 flags) {
+    u32 old = read_cr3();
+    write_cr3(cr3_phys);
+    g_page_directory = (u32*)(read_cr3() + KERNEL_VIRT_BASE);
+    bool ok = vmm_map_page(virt_addr, phys_addr, flags | PAGE_USER);
+    write_cr3(old);
+    g_page_directory = (u32*)(read_cr3() + KERNEL_VIRT_BASE);
+    return ok;
+}
+
+bool vmm_user_accessible(u32 virt_addr) {
+    u32 pde_index = virt_addr >> 22;
+    u32 pte_index = (virt_addr >> 12) & 0x3FFU;
+    u32 pde = g_page_directory[pde_index];
+    if ((pde & (PAGE_PRESENT | PAGE_USER)) != (PAGE_PRESENT | PAGE_USER)) return false;
+    u32* table = (u32*)((pde & 0xFFFFF000U) + KERNEL_VIRT_BASE);
+    u32 pte = table[pte_index];
+    return (pte & (PAGE_PRESENT | PAGE_USER)) == (PAGE_PRESENT | PAGE_USER);
+}
