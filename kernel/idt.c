@@ -1,0 +1,115 @@
+#include "types.h"
+
+void panic(const char* msg);
+void vga_write(const char* s);
+void vga_write_u32(u32 value);
+
+struct idt_entry {
+    u16 offset_low;
+    u16 selector;
+    u8  zero;
+    u8  type_attr;
+    u16 offset_high;
+} __attribute__((packed));
+
+struct regs {
+    u32 gs, fs, es, ds;
+    u32 edi, esi, ebp, esp;
+    u32 ebx, edx, ecx, eax;
+    u32 int_no, err_code;
+    u32 eip, cs, eflags;
+};
+
+typedef void (*interrupt_handler_t)(struct regs* r);
+
+extern void* isr_stub_table[];
+
+static struct idt_entry idt[IDT_ENTRIES];
+static interrupt_handler_t handlers[IDT_ENTRIES];
+
+static const char* exception_messages[32] = {
+    "Division by zero", "Debug", "NMI", "Breakpoint",
+    "Overflow", "Bound range exceeded", "Invalid opcode", "Device not available",
+    "Double fault", "Coprocessor segment overrun", "Invalid TSS", "Segment not present",
+    "Stack-segment fault", "General protection fault", "Page fault", "Reserved",
+    "x87 floating-point exception", "Alignment check", "Machine check", "SIMD floating-point exception",
+    "Virtualization exception", "Control protection exception", "Reserved", "Reserved",
+    "Reserved", "Reserved", "Reserved", "Reserved",
+    "Hypervisor injection exception", "VMM communication exception", "Security exception", "Reserved"
+};
+
+static void idt_set_gate(u8 vector, u32 handler_addr, u16 selector, u8 type_attr) {
+    idt[vector].offset_low = (u16)(handler_addr & 0xFFFFU);
+    idt[vector].selector = selector;
+    idt[vector].zero = 0;
+    idt[vector].type_attr = type_attr;
+    idt[vector].offset_high = (u16)((handler_addr >> 16) & 0xFFFFU);
+}
+
+void idt_register_handler(u8 vector, interrupt_handler_t fn) {
+    handlers[vector] = fn;
+}
+
+void pic_remap(void) {
+    u8 mask1 = inb(PIC1_DATA);
+    u8 mask2 = inb(PIC2_DATA);
+
+    outb(PIC1_COMMAND, 0x11);
+    io_wait();
+    outb(PIC2_COMMAND, 0x11);
+    io_wait();
+
+    outb(PIC1_DATA, 0x20);
+    io_wait();
+    outb(PIC2_DATA, 0x28);
+    io_wait();
+
+    outb(PIC1_DATA, 0x04);
+    io_wait();
+    outb(PIC2_DATA, 0x02);
+    io_wait();
+
+    outb(PIC1_DATA, 0x01);
+    io_wait();
+    outb(PIC2_DATA, 0x01);
+    io_wait();
+
+    outb(PIC1_DATA, mask1);
+    outb(PIC2_DATA, mask2);
+}
+
+void pic_clear_masks(void) {
+    outb(PIC1_DATA, 0x00);
+    outb(PIC2_DATA, 0x00);
+}
+
+void idt_init(void) {
+    for (u32 i = 0; i < IDT_ENTRIES; ++i) {
+        handlers[i] = 0;
+        idt_set_gate((u8)i, (u32)isr_stub_table[i], GDT_KERNEL_CODE_SELECTOR, 0x8EU);
+    }
+
+    lidt(idt, sizeof(idt) - 1U);
+}
+
+void isr_dispatch(struct regs* r) {
+    if (r->int_no < 32U) {
+        vga_write("\n[EXCEPTION] #");
+        vga_write_u32(r->int_no);
+        vga_write(": ");
+        vga_write(exception_messages[r->int_no]);
+        vga_write("\n");
+        panic("Unhandled CPU exception");
+    }
+
+    if (handlers[r->int_no] != 0) {
+        handlers[r->int_no](r);
+    }
+
+    if (r->int_no >= 32U && r->int_no <= 47U) {
+        if (r->int_no >= 40U) {
+            outb(PIC2_COMMAND, PIC_EOI);
+        }
+        outb(PIC1_COMMAND, PIC_EOI);
+    }
+}
