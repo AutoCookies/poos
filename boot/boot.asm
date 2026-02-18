@@ -2,11 +2,12 @@
 org 0x7C00
 
 %define KERNEL_LOAD_ADDR 0x00100000
-%define BOOT_DRIVE_ADDR  0x7C00
 %define REALMODE_STACK   0x7C00
 %define PMODE_STACK      0x0009FC00
 %define KERNEL_LBA_START 1
-%define KERNEL_SECTORS   128
+%define KERNEL_SECTORS   256
+%define BOOTINFO_ADDR    0x9000
+%define E820_ENTRIES_MAX 128
 
 start:
     cli
@@ -18,6 +19,7 @@ start:
 
     mov [boot_drive], dl
 
+    call build_bootinfo
     call enable_a20
 
     lgdt [gdt_descriptor]
@@ -25,8 +27,44 @@ start:
     mov eax, cr0
     or eax, 0x1
     mov cr0, eax
-
     jmp 0x08:protected_mode_entry
+
+build_bootinfo:
+    mov di, BOOTINFO_ADDR
+    mov dword [di + 0], 0x534F4F50
+    mov dword [di + 4], 2
+    mov dword [di + 8], 0
+    mov dword [di + 12], 0
+    mov dword [di + 16], KERNEL_LOAD_ADDR
+    mov dword [di + 20], 0
+
+    mov di, BOOTINFO_ADDR + 24
+    xor ebx, ebx
+    xor bp, bp
+.e820_loop:
+    mov eax, 0xE820
+    mov edx, 0x534D4150
+    mov ecx, 24
+    int 0x15
+    jc .done
+    cmp eax, 0x534D4150
+    jne .done
+
+    inc bp
+    add di, 24
+    cmp bp, E820_ENTRIES_MAX
+    jae .done
+    test ebx, ebx
+    jnz .e820_loop
+.done:
+    mov dword [BOOTINFO_ADDR + 12], ebp
+    cmp bp, 0
+    je .ret
+    mov eax, [BOOTINFO_ADDR + 8]
+    or eax, 1
+    mov [BOOTINFO_ADDR + 8], eax
+.ret:
+    ret
 
 [bits 32]
 protected_mode_entry:
@@ -44,6 +82,7 @@ protected_mode_entry:
     mov edi, KERNEL_LOAD_ADDR
     call ata_lba_read
 
+    mov eax, BOOTINFO_ADDR
     jmp 0x08:KERNEL_LOAD_ADDR
 
 hang:
@@ -51,7 +90,6 @@ hang:
     hlt
     jmp hang
 
-; Fast A20 gate via port 0x92
 enable_a20:
     in al, 0x92
     test al, 0x02
@@ -62,13 +100,11 @@ enable_a20:
 .done:
     ret
 
-; Read ECX sectors from EAX LBA to EDI using ATA PIO, primary master.
 ata_lba_read:
     pushad
 .next_sector:
-    cmp ecx, 0
-    je .done
-
+    test ecx, ecx
+    jz .done
     call ata_wait_not_busy
 
     mov dx, 0x1F2
@@ -112,28 +148,27 @@ ata_lba_read:
     inc eax
     dec ecx
     jmp .next_sector
-
 .done:
     popad
     ret
 
 ata_wait_not_busy:
     mov dx, 0x1F7
-.wait:
+.wait1:
     in al, dx
     test al, 0x80
-    jnz .wait
+    jnz .wait1
     ret
 
 ata_wait_drq:
     mov dx, 0x1F7
-.wait:
+.wait2:
     in al, dx
     test al, 0x08
     jnz .ready
     test al, 0x01
     jnz hang
-    jmp .wait
+    jmp .wait2
 .ready:
     ret
 

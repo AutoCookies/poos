@@ -85,3 +85,12 @@ void vga_write_u32(u32 value) {
         vga_putc(buf[--idx]);
     }
 }
+
+void vga_write_hex(u32 value) {
+    vga_write("0x");
+    for (i32 i = 7; i >= 0; --i) {
+        u8 nibble = (u8)((value >> (u32)(i * 4)) & 0xFU);
+        char c = (nibble < 10U) ? (char)('0' + nibble) : (char)('A' + nibble - 10U);
+        vga_putc(c);
+    }
+}

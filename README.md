@@ -1,75 +1,116 @@
-# PoOS v0.1
+# PoOS v0.2
 
-PoOS v0.1 is a minimal but production-minded educational 32-bit x86 kernel that boots directly via BIOS, transitions to protected mode, and initializes the core interrupt/timer/display subsystems needed for continued OS development.
+PoOS v0.2 extends the v0.1 boot/interrupt/timer foundation with a complete memory stack suitable for future SMP and user-mode work:
 
-## Architecture overview
+- BIOS E820 memory discovery passed through a strict `BootInfo` contract.
+- Bitmap-based physical memory manager (PMM) with explicit reserved regions.
+- 32-bit paging with identity + higher-half kernel mapping (`0xC0000000`).
+- Virtual memory management APIs for page/range map/unmap/translate.
+- Deterministic kernel heap that grows by mapping PMM frames.
+- Hard invariants (`POOS_ASSERT`) and memory sanity checks.
 
-PoOS is split into a strict two-stage architecture:
+## Boot and memory contract
 
-1. **Boot stage (`boot/`)**
-   - BIOS loads the boot sector at `0x7C00`.
-   - Boot code enables A20, loads a flat GDT, switches to 32-bit protected mode, then reads kernel sectors from disk using ATA PIO into physical `0x00100000`.
-   - Control transfers to kernel entry at 1 MiB.
+### BootInfo source of truth
 
-2. **Kernel stage (`kernel/`)**
-   - Entry assembly establishes segment registers and a dedicated kernel stack.
-   - `kernel_main()` initializes GDT, IDT, PIC remap, PIT timer, VGA text output, and global interrupts.
-   - IRQ0 (timer) fires at 100 Hz and prints a periodic heartbeat.
+`kernel/bootinfo.h` defines:
 
-## Memory layout
+- `BootInfo.magic` (`'POOS'`)
+- `BootInfo.version` (`2`)
+- `BootInfo.flags`
+- `BootInfo.e820_count`
+- `BootInfo.e820_entries[128]`
+- `BootInfo.kernel_phys_start/kernel_phys_end`
 
-PoOS currently assumes this baseline memory map:
+The boot sector populates BootInfo at physical `0x9000` and kernel entry receives a pointer to it in `EAX`.
 
-- `0x00000000 - 0x0009FFFF`: usable conventional RAM
-- `0x000A0000 - 0x000FFFFF`: reserved (video BIOS / devices / ROM)
-- `0x00100000+`: kernel image load + execution base
+### E820 flow
 
-Additional fixed regions:
+1. Boot code runs INT `0x15/E820` in real mode.
+2. Entries are stored in `BootInfo.e820_entries`.
+3. Kernel validates `magic/version` and uses E820 as the PMM source of truth.
 
-- Boot sector executes at `0x00007C00`.
-- Boot protected-mode stack uses memory below 1 MiB (`0x0009FC00`).
-- Kernel stack is defined in `.bss` and linked at/above 1 MiB.
-- VGA text memory is mapped at `0x000B8000`.
+## Higher-half model
 
-## Boot flow
+PoOS now uses a higher-half linked kernel:
 
-1. BIOS loads MBR sector and jumps to boot code.
-2. Boot code initializes 16-bit environment and stack.
-3. A20 is enabled through port `0x92`.
-4. Boot-time GDT is loaded and protected mode is enabled (`CR0.PE=1`).
-5. 32-bit boot code reads kernel sectors from LBA 1 into `0x00100000`.
-6. Far jump to kernel entry (`_start`).
-7. Kernel brings up descriptor tables, interrupts, timer, and console.
+- Physical load base: `0x00100000`
+- Virtual link base: `0xC0000000`
+- Linked start VMA: `0xC0100000`
 
-## Kernel initialization sequence
+Linker exports:
 
-`kernel_main()` performs:
+- `__kernel_phys_start`, `__kernel_phys_end`
+- `__kernel_virt_start`, `__kernel_virt_end`
+- `__bss_start`, `__bss_end`
 
-1. VGA console clear and early boot message.
-2. Runtime GDT initialization and segment reload.
-3. IDT installation with 256 ISR stubs.
-4. PIC remap to vectors `0x20-0x2F` and IRQ mask clear.
-5. PIT programming to 100 Hz (IRQ0 handler registered).
-6. `sti` (interrupts enabled).
-7. Idle loop with `hlt`.
+Early entry (`kernel/entry.asm`) builds bootstrap page structures, identity maps low 4 MiB, aliases that mapping at PDE index 768 (`0xC0000000`), enables paging, then jumps into the higher-half execution path.
 
-## Cross-compiler setup
+## PMM design
 
-PoOS expects an `i686-elf` cross toolchain in `PATH`:
+PMM (`kernel/mem/pmm.c`) uses 4 KiB frames and a bitmap:
 
-- `i686-elf-gcc`
-- `i686-elf-ld`
-- `i686-elf-objcopy`
-- `nasm`
-- `qemu-system-i386`
+- Tracks up to 4 GiB (1,048,576 frames).
+- Starts as fully reserved, frees only E820 `type=1` ranges.
+- Re-reserves critical regions:
+  - `0x00000000 - 0x000FFFFF`
+  - VGA MMIO page (`0xB8000`)
+  - kernel physical image range
 
-Typical GNU cross target tuple is `i686-elf`.
+APIs:
 
-If your prefix differs, override at build time:
+- `pmm_alloc_frame()`
+- `pmm_free_frame()`
+- `pmm_reserve_region()` / `pmm_release_region()`
+- `pmm_get_stats()`
 
-```bash
-make CROSS=<your-prefix>
-```
+## Paging + VMM design
+
+Page flags are centralized in `kernel/mem/paging.h`:
+
+- `PAGE_PRESENT`, `PAGE_RW`, `PAGE_USER`, `PAGE_WRITE_THROUGH`, `PAGE_CACHE_DISABLE`, `PAGE_GLOBAL`
+
+VMM (`kernel/mem/vmm.c`) exposes:
+
+- `vmm_map_page(virt, phys, flags)`
+- `vmm_unmap_page(virt)`
+- `vmm_translate(virt, &phys)`
+- `vmm_map_range(virt, phys, size, flags)`
+
+Kernel keeps both identity and higher-half mapping active for stability during bring-up.
+
+## Kernel heap strategy
+
+Heap (`kernel/mem/heap.c`) is a deterministic free-list allocator in virtual region `0xC1000000+`:
+
+- Initial mapped size: 16 pages.
+- Growth: allocate frames from PMM, map into heap via VMM.
+- API:
+  - `kmalloc(size, align)`
+  - `kfree(ptr)` (asserts on invalid/free-state violations)
+
+## Diagnostics and invariants
+
+- `POOS_ASSERT(condition)` panics with expression + `file:line`.
+- Exception path decodes page faults (CR2 + error code).
+- `mem_sanity_check()` verifies PMM allocation/free behavior.
+- Boot logs include E820 summary, PMM stats, CR0/CR3 paging status.
+- Heap + VMM smoke tests run during kernel init.
+
+## Initialization order (v0.2)
+
+`kernel_main()`:
+
+1. Early VGA init
+2. GDT/IDT/PIC init
+3. BootInfo parse + kernel physical bounds publish
+4. PMM init
+5. VMM init
+6. Heap init
+7. Memory sanity + smoke tests
+8. PIT init and interrupts enable
+9. Memory summary print
+10. Idle loop
 
 ## Build and run
 
@@ -78,34 +119,18 @@ make build
 make run
 ```
 
-The build creates:
+Toolchain defaults to `i686-elf-*`; for local validation with host tools you can override:
 
-- `build/boot.bin` (exactly 512-byte boot sector with `0xAA55` signature)
-- `build/kernel.elf` (linked kernel ELF)
-- `build/kernel.bin` (flat kernel image)
-- `build/poos.img` (bootable raw disk image for QEMU)
-
-## Project layout
-
-```
-boot/
-  boot.asm
-  gdt.asm
-kernel/
-  entry.asm
-  kernel.c
-  gdt.c
-  idt.c
-  isr.asm
-  timer.c
-  vga.c
-  panic.c
-  types.h
-linker.ld
-Makefile
-README.md
+```bash
+make CROSS=i686-elf CC=gcc LD=ld OBJCOPY=objcopy build
 ```
 
-## Current status
+## Forward path (v0.3+)
 
-PoOS v0.1 provides a clean base for future additions: paging, physical/virtual memory allocators, scheduler, syscall ABI, user mode transitions, ELF loading, filesystems, and SMP.
+This architecture is now ready for:
+
+- per-process page directories and user/supervisor separation
+- copy-on-write and demand paging
+- slab allocators over PMM frames
+- scheduler + task address spaces
+- SMP-safe locking around PMM/VMM/heap
