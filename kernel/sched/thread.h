@@ -34,6 +34,7 @@ struct thread {
     u32 stack_canary;
     void (*entry)(void* arg);
     void* arg;
+    void* task_ctx;
 };
 
 void thread_fill_name(struct thread* t, const char* name);

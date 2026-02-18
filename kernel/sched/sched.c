@@ -5,6 +5,7 @@
 #include "../mem/heap.h"
 #include "../time/time.h"
 #include "../arch/x86/cpu.h"
+#include "../proc/task.h"
 
 void panic(const char* msg);
 void vga_write(const char* s);
@@ -39,10 +40,13 @@ static struct thread* sched_pick_next(void) {
     return t;
 }
 
+extern void task_on_switch(struct thread* next);
+
 static void sched_switch_to(struct thread* next) {
     struct thread* prev = current_thread;
     current_thread = next;
     next->state = THREAD_RUNNING;
+    task_on_switch(next);
     next->timeslice_remaining = SCHED_TIMESLICE_TICKS;
 
     if (prev == 0) {
@@ -103,7 +107,7 @@ struct thread* kthread_create(const char* name, void (*entry)(void*), void* arg,
     t->arg = arg;
     t->timeslice_remaining = SCHED_TIMESLICE_TICKS;
     t->wakeup_tick = 0;
-    t->rq_next = 0; t->rq_prev = 0; t->sleep_next = 0;
+    t->rq_next = 0; t->rq_prev = 0; t->sleep_next = 0; t->task_ctx = 0;
     t->kernel_stack_base = (u8*)kmalloc(THREAD_STACK_SIZE + 16U, 16U);
     if (t->kernel_stack_base == 0) {
         spin_unlock_irqrestore(&sched_lock, g);
@@ -122,6 +126,7 @@ struct thread* kthread_create(const char* name, void (*entry)(void*), void* arg,
     *(--sp) = 0U;
     t->context_sp = sp;
 
+    task_bind_kernel_thread(t);
     runqueue_push(t);
     spin_unlock_irqrestore(&sched_lock, g);
     return t;

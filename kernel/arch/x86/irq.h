@@ -1,20 +1,16 @@
 #ifndef POOS_ARCH_X86_IRQ_H
 #define POOS_ARCH_X86_IRQ_H
 
-#include "../../types.h"
+#include "idt.h"
 
-struct regs {
-    u32 gs, fs, es, ds;
-    u32 edi, esi, ebp, esp;
-    u32 ebx, edx, ecx, eax;
-    u32 int_no, err_code;
-    u32 eip, cs, eflags;
-};
+#define PIC1_COMMAND 0x20U
+#define PIC1_DATA    0x21U
+#define PIC2_COMMAND 0xA0U
+#define PIC2_DATA    0xA1U
+#define PIC_EOI      0x20U
 
-typedef void (*interrupt_handler_t)(struct regs* r);
+typedef struct trapframe regs_t;
 
-void idt_init(void);
-void idt_register_handler(u8 vector, interrupt_handler_t fn);
 void irq_init(void);
 void pic_remap(void);
 void pic_clear_masks(void);
