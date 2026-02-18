@@ -6,6 +6,9 @@ org 0x7C00
 %define PMODE_STACK      0x0009FC00
 %define KERNEL_LBA_START 1
 %define KERNEL_SECTORS   256
+%define INITRD_LOAD_ADDR 0x00180000
+%define INITRD_LBA_START 300
+%define INITRD_SECTORS   512
 %define BOOTINFO_ADDR    0x9000
 %define E820_ENTRIES_MAX 128
 
@@ -37,8 +40,10 @@ build_bootinfo:
     mov dword [di + 12], 0
     mov dword [di + 16], KERNEL_LOAD_ADDR
     mov dword [di + 20], 0
+    mov dword [di + 24], INITRD_LOAD_ADDR
+    mov dword [di + 28], (INITRD_SECTORS * 512)
 
-    mov di, BOOTINFO_ADDR + 24
+    mov di, BOOTINFO_ADDR + 32
     xor ebx, ebx
     xor bp, bp
 .e820_loop:
@@ -80,6 +85,12 @@ protected_mode_entry:
     mov eax, KERNEL_LBA_START
     mov ecx, KERNEL_SECTORS
     mov edi, KERNEL_LOAD_ADDR
+    call ata_lba_read
+
+    mov dl, [boot_drive]
+    mov eax, INITRD_LBA_START
+    mov ecx, INITRD_SECTORS
+    mov edi, INITRD_LOAD_ADDR
     call ata_lba_read
 
     mov eax, BOOTINFO_ADDR

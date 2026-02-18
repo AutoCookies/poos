@@ -24,6 +24,8 @@ struct BootInfo {
     u32 e820_count;
     u32 kernel_phys_start;
     u32 kernel_phys_end;
+    u32 initrd_phys_start;
+    u32 initrd_size;
     struct E820Entry e820_entries[BOOTINFO_MAX_E820_ENTRIES];
 } __attribute__((packed));
 
