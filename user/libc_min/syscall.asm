@@ -1,6 +1,7 @@
 [bits 32]
 global sys_write, sys_exit, sys_yield, sys_sleep, sys_getpid
 global sys_open, sys_close, sys_read, sys_lseek, sys_stat, sys_getdents, sys_execve, sys_waitpid, sys_spawn
+global sys_fork, sys_pipe, sys_dup2, sys_kill
 sys_write: mov eax,1
            mov ebx,[esp+4]
            mov ecx,[esp+8]
@@ -66,3 +67,20 @@ sys_spawn: mov eax,14
            mov ebx,[esp+4]
            int 0x80
            ret
+sys_fork: mov eax,15
+          int 0x80
+          ret
+sys_pipe: mov eax,16
+          mov ebx,[esp+4]
+          int 0x80
+          ret
+sys_dup2: mov eax,17
+          mov ebx,[esp+4]
+          mov ecx,[esp+8]
+          int 0x80
+          ret
+sys_kill: mov eax,18
+          mov ebx,[esp+4]
+          mov ecx,[esp+8]
+          int 0x80
+          ret

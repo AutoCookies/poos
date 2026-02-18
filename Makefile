@@ -18,7 +18,7 @@ INITRD_TAR := $(BUILD_DIR)/initrd.tar
 
 INITRD_LBA := 300
 
-USER_APPS := init sh ls cat hello
+USER_APPS := init sh ls cat hello sleep fault
 USER_ELFS := $(patsubst %,$(BUILD_DIR)/user/%.elf,$(USER_APPS))
 USER_COMMON_OBJS := $(BUILD_DIR)/user/crt0.o $(BUILD_DIR)/user/libc_min/syscall.o $(BUILD_DIR)/user/libc_min/printf_min.o $(BUILD_DIR)/user/libc_min/string.o
 
@@ -31,7 +31,9 @@ KERNEL_C_SRCS := \
 	kernel/proc/usercopy.c kernel/proc/ustack.c kernel/proc/exec.c kernel/proc/wait.c kernel/proc/reaper.c \
 	kernel/syscall/syscall.c kernel/syscall/sys_dispatch.c kernel/syscall/sys_impl.c \
 	kernel/vfs/vnode.c kernel/vfs/vfs.c kernel/vfs/path.c kernel/vfs/file.c kernel/vfs/fdtable.c kernel/vfs/mount.c kernel/vfs/vfs_debug.c \
-	kernel/fs/initrd.c kernel/fs/tarfs.c kernel/fs/devfs.c
+	kernel/fs/initrd.c kernel/fs/tarfs.c kernel/fs/devfs.c kernel/fs/memfs.c \
+	kernel/ipc/ringbuf.c kernel/ipc/pipe.c kernel/tty/tty.c kernel/tty/kbd.c kernel/tty/console.c \
+	kernel/proc/signal.c kernel/proc/proc_table.c kernel/proc/fork.c kernel/proc/thread_user.c kernel/proc/mm_clone.c
 
 KERNEL_ASM_SRCS := kernel/entry.asm kernel/arch/x86/isr_stubs.asm kernel/arch/x86/ring3.asm kernel/arch/x86/syscall_stub.asm kernel/sched/context_switch.asm
 
@@ -54,6 +56,8 @@ $(INITRD_TAR): $(USER_ELFS) user/pack/mkinitrd.sh
 	cp $(BUILD_DIR)/user/ls.elf user/pack/rootfs/bin/ls
 	cp $(BUILD_DIR)/user/cat.elf user/pack/rootfs/bin/cat
 	cp $(BUILD_DIR)/user/hello.elf user/pack/rootfs/bin/hello
+	cp $(BUILD_DIR)/user/sleep.elf user/pack/rootfs/bin/sleep
+	cp $(BUILD_DIR)/user/fault.elf user/pack/rootfs/bin/fault
 	user/pack/mkinitrd.sh user/pack/rootfs $(INITRD_TAR)
 
 $(BOOT_BIN): boot/boot.asm boot/gdt.asm

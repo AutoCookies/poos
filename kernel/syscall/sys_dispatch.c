@@ -1,3 +1,4 @@
+#include "../proc/signal.h"
 #include "../arch/x86/idt.h"
 #include "sys_defs.h"
 
@@ -15,6 +16,10 @@ int sys_getdents(int fd, void* buf, u32 len);
 int sys_execve(const char* path);
 int sys_waitpid(int pid, int* status);
 int sys_spawn(const char* path);
+int sys_fork(struct trapframe* tf);
+int sys_pipe(int* ufds);
+int sys_dup2(int oldfd, int newfd);
+int sys_kill(int pid, int sig);
 
 void syscall_dispatch(struct trapframe* tf) {
     int ret = -38;
@@ -33,7 +38,12 @@ void syscall_dispatch(struct trapframe* tf) {
         case SYS_EXECVE: ret = sys_execve((const char*)tf->ebx); break;
         case SYS_WAITPID: ret = sys_waitpid((int)tf->ebx, (int*)tf->ecx); break;
         case SYS_SPAWN: ret = sys_spawn((const char*)tf->ebx); break;
+        case SYS_FORK: ret = sys_fork(tf); break;
+        case SYS_PIPE: ret = sys_pipe((int*)tf->ebx); break;
+        case SYS_DUP2: ret = sys_dup2((int)tf->ebx, (int)tf->ecx); break;
+        case SYS_KILL: ret = sys_kill((int)tf->ebx, (int)tf->ecx); break;
         default: break;
     }
     tf->eax = (u32)ret;
+    signal_poll_current();
 }

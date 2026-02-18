@@ -18,6 +18,10 @@ enum {
     SYS_EXECVE = 12,
     SYS_WAITPID = 13,
     SYS_SPAWN = 14,
+    SYS_FORK = 15,
+    SYS_PIPE = 16,
+    SYS_DUP2 = 17,
+    SYS_KILL = 18,
 };
 
 #endif

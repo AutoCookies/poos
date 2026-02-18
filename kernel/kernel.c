@@ -16,6 +16,8 @@
 #include "fs/initrd.h"
 #include "fs/tarfs.h"
 #include "fs/devfs.h"
+#include "fs/memfs.h"
+#include "tty/tty.h"
 
 void vga_init(void);
 void vga_write(const char* s);
@@ -40,6 +42,8 @@ void kernel_main(struct BootInfo* bootinfo) {
 
     gdt_init();
     irq_init();
+    tty_init();
+    kbd_init();
 
     bootinfo->kernel_phys_start = (u32)&__kernel_phys_start;
     bootinfo->kernel_phys_end = (u32)&__kernel_phys_end;
@@ -64,6 +68,10 @@ void kernel_main(struct BootInfo* bootinfo) {
     }
     if (vfs_mount("/dev", devfs_root()) < 0) {
         vga_write("panic: failed to mount /dev\n");
+        for (;;) cpu_hlt();
+    }
+    if (vfs_mount("/tmp", memfs_root()) < 0) {
+        vga_write("panic: failed to mount /tmp\n");
         for (;;) cpu_hlt();
     }
     vga_write("mounted / from initrd (tarfs)\n");

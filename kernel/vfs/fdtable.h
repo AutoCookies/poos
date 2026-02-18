@@ -11,8 +11,10 @@ struct fdtable {
 
 void fdtable_init(struct fdtable* fdt);
 int fdtable_alloc(struct fdtable* fdt, struct file* f);
+int fdtable_set(struct fdtable* fdt, int fd, struct file* f);
 struct file* fdtable_get(struct fdtable* fdt, int fd);
 int fdtable_close(struct fdtable* fdt, int fd);
+int fdtable_dup2(struct fdtable* fdt, int oldfd, int newfd);
 void fdtable_clone(struct fdtable* dst, struct fdtable* src);
 
 #endif
