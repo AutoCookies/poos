@@ -1,116 +1,93 @@
-# PoOS v0.2
+# PoOS v0.3
 
-PoOS v0.2 extends the v0.1 boot/interrupt/timer foundation with a complete memory stack suitable for future SMP and user-mode work:
+PoOS v0.3 adds a preemptive kernel threading and scheduling foundation on top of the v0.2 memory stack.
 
-- BIOS E820 memory discovery passed through a strict `BootInfo` contract.
-- Bitmap-based physical memory manager (PMM) with explicit reserved regions.
-- 32-bit paging with identity + higher-half kernel mapping (`0xC0000000`).
-- Virtual memory management APIs for page/range map/unmap/translate.
-- Deterministic kernel heap that grows by mapping PMM frames.
-- Hard invariants (`POOS_ASSERT`) and memory sanity checks.
+## Concurrency model
 
-## Boot and memory contract
+- **Kernel threads (`kthreads`)** with explicit lifecycle states:
+  - `THREAD_RUNNING`
+  - `THREAD_READY`
+  - `THREAD_BLOCKED`
+  - `THREAD_SLEEPING`
+  - `THREAD_ZOMBIE`
+- **Per-thread kernel stack**: 16 KiB stack per thread allocated from kernel heap, aligned to 16 bytes.
+- **Thread control block (TCB)** stores id, name, state, stack base/top, saved context SP, timeslice bookkeeping, wakeup tick, queue links, and stack canary.
 
-### BootInfo source of truth
+## Context switch ABI
 
-`kernel/bootinfo.h` defines:
+Context switching is split between C scheduler policy and ASM state movement:
 
-- `BootInfo.magic` (`'POOS'`)
-- `BootInfo.version` (`2`)
-- `BootInfo.flags`
-- `BootInfo.e820_count`
-- `BootInfo.e820_entries[128]`
-- `BootInfo.kernel_phys_start/kernel_phys_end`
+- C signature:
+  - `void context_switch(u32** prev_sp_out, u32* next_sp);`
+- ASM (`kernel/sched/context_switch.asm`) saves/restores:
+  - `EFLAGS`, `EBX`, `ESI`, `EDI`, `EBP`, and stack pointer (`ESP` via `prev_sp_out`).
+- New threads are bootstrapped with a fabricated stack frame that returns into a trampoline which invokes thread entry and then `kthread_exit()`.
 
-The boot sector populates BootInfo at physical `0x9000` and kernel entry receives a pointer to it in `EAX`.
+## Scheduler policy (round-robin v1)
 
-### E820 flow
+- **Preemptive round-robin** with fixed timeslice: `SCHED_TIMESLICE_TICKS = 10`.
+- **Timer source**: PIT at `POOS_TIMER_HZ = 100`.
+- On each timer IRQ:
+  1. increment global tick
+  2. wake sleeping threads whose `wakeup_tick <= now`
+  3. decrement running thread timeslice
+  4. request reschedule when slice reaches zero
+- IRQ return path triggers `sched_reschedule_from_irq()` when reschedule is pending.
 
-1. Boot code runs INT `0x15/E820` in real mode.
-2. Entries are stored in `BootInfo.e820_entries`.
-3. Kernel validates `magic/version` and uses E820 as the PMM source of truth.
+## Runqueue and sleep queue
 
-## Higher-half model
+- **Runqueue**: intrusive O(1) FIFO doubly-linked list.
+- **Sleep queue**: intrusive sorted singly-linked list by wake tick.
+- `kthread_sleep(ticks)` blocks without busy waiting and requeues the thread when wakeup condition is met.
 
-PoOS now uses a higher-half linked kernel:
+## Public thread API
 
-- Physical load base: `0x00100000`
-- Virtual link base: `0xC0000000`
-- Linked start VMA: `0xC0100000`
+- `kthread_create(name, entry, arg, priority)`
+- `kthread_yield()`
+- `kthread_sleep(ticks)`
+- `kthread_exit()`
 
-Linker exports:
+## IRQ/preemption boundary rules
 
-- `__kernel_phys_start`, `__kernel_phys_end`
-- `__kernel_virt_start`, `__kernel_virt_end`
-- `__bss_start`, `__bss_end`
-
-Early entry (`kernel/entry.asm`) builds bootstrap page structures, identity maps low 4 MiB, aliases that mapping at PDE index 768 (`0xC0000000`), enables paging, then jumps into the higher-half execution path.
-
-## PMM design
-
-PMM (`kernel/mem/pmm.c`) uses 4 KiB frames and a bitmap:
-
-- Tracks up to 4 GiB (1,048,576 frames).
-- Starts as fully reserved, frees only E820 `type=1` ranges.
-- Re-reserves critical regions:
-  - `0x00000000 - 0x000FFFFF`
-  - VGA MMIO page (`0xB8000`)
-  - kernel physical image range
-
-APIs:
-
-- `pmm_alloc_frame()`
-- `pmm_free_frame()`
-- `pmm_reserve_region()` / `pmm_release_region()`
-- `pmm_get_stats()`
-
-## Paging + VMM design
-
-Page flags are centralized in `kernel/mem/paging.h`:
-
-- `PAGE_PRESENT`, `PAGE_RW`, `PAGE_USER`, `PAGE_WRITE_THROUGH`, `PAGE_CACHE_DISABLE`, `PAGE_GLOBAL`
-
-VMM (`kernel/mem/vmm.c`) exposes:
-
-- `vmm_map_page(virt, phys, flags)`
-- `vmm_unmap_page(virt)`
-- `vmm_translate(virt, &phys)`
-- `vmm_map_range(virt, phys, size, flags)`
-
-Kernel keeps both identity and higher-half mapping active for stability during bring-up.
-
-## Kernel heap strategy
-
-Heap (`kernel/mem/heap.c`) is a deterministic free-list allocator in virtual region `0xC1000000+`:
-
-- Initial mapped size: 16 pages.
-- Growth: allocate frames from PMM, map into heap via VMM.
-- API:
-  - `kmalloc(size, align)`
-  - `kfree(ptr)` (asserts on invalid/free-state violations)
+- All hardware IRQs send PIC EOI.
+- Timer IRQ remains minimal and performs no slow logging.
+- Scheduler checks IRQ nesting depth and panics on unsupported nested scheduling (`PANIC_ON_IRQ_NESTING_BUG`).
+- Scheduling and queue mutation occur with interrupts disabled under a UP-safe spinlock.
 
 ## Diagnostics and invariants
 
-- `POOS_ASSERT(condition)` panics with expression + `file:line`.
-- Exception path decodes page faults (CR2 + error code).
-- `mem_sanity_check()` verifies PMM allocation/free behavior.
-- Boot logs include E820 summary, PMM stats, CR0/CR3 paging status.
-- Heap + VMM smoke tests run during kernel init.
+- Thread stack canary (`THREAD_CANARY`) checked during timer tick and context switches.
+- `sched_assert_invariants()` validates:
+  - current thread is `RUNNING`
+  - sleeping threads are not present in runqueue
+  - only sleeping threads are in sleep queue
+- Existing panic/page-fault reporting remains active.
 
-## Initialization order (v0.2)
+## Boot demo behavior
 
-`kernel_main()`:
+Boot prints:
 
-1. Early VGA init
-2. GDT/IDT/PIC init
-3. BootInfo parse + kernel physical bounds publish
-4. PMM init
-5. VMM init
-6. Heap init
-7. Memory sanity + smoke tests
-8. PIT init and interrupts enable
-9. Memory summary print
-10. Idle loop
+- PoOS v0.3 banner
+- timer frequency and timeslice
+- thread table with id/name/stack range
+- current tick counter
+
+Demo threads:
+
+- `idle`: halts CPU in low-power idle loop
+- `workerA`: prints `A` every ~200 ms
+- `workerB`: prints `B` every ~350 ms
+- `ticker`: prints `ticks=...` once per second
+
+Output should interleave continuously under preemption.
+
+## Known limitations
+
+- UP only (single-core scheduling model)
+- no user-mode processes yet
+- no syscall interface yet
+- no per-process address-space switching yet
+- fixed in-kernel thread table (`MAX_THREADS=32`)
 
 ## Build and run
 
@@ -118,19 +95,3 @@ Heap (`kernel/mem/heap.c`) is a deterministic free-list allocator in virtual reg
 make build
 make run
 ```
-
-Toolchain defaults to `i686-elf-*`; for local validation with host tools you can override:
-
-```bash
-make CROSS=i686-elf CC=gcc LD=ld OBJCOPY=objcopy build
-```
-
-## Forward path (v0.3+)
-
-This architecture is now ready for:
-
-- per-process page directories and user/supervisor separation
-- copy-on-write and demand paging
-- slab allocators over PMM frames
-- scheduler + task address spaces
-- SMP-safe locking around PMM/VMM/heap

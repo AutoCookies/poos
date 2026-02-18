@@ -17,8 +17,14 @@ IMAGE := $(BUILD_DIR)/poos.img
 KERNEL_C_SRCS := \
 	kernel/kernel.c \
 	kernel/gdt.c \
-	kernel/idt.c \
-	kernel/timer.c \
+	kernel/arch/x86/irq.c \
+	kernel/arch/x86/pic.c \
+	kernel/arch/x86/pit.c \
+	kernel/time/time.c \
+	kernel/sched/sched.c \
+	kernel/sched/thread.c \
+	kernel/sched/runqueue.c \
+	kernel/sched/sleepq.c \
 	kernel/vga.c \
 	kernel/panic.c \
 	kernel/mem/mem.c \
@@ -31,7 +37,8 @@ KERNEL_C_SRCS := \
 
 KERNEL_ASM_SRCS := \
 	kernel/entry.asm \
-	kernel/isr.asm
+	kernel/arch/x86/isr_stubs.asm \
+	kernel/sched/context_switch.asm
 
 KERNEL_OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(KERNEL_C_SRCS)) \
 	$(patsubst %.asm,$(BUILD_DIR)/%.o,$(KERNEL_ASM_SRCS))

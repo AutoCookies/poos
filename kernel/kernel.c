@@ -5,16 +5,15 @@
 #include "mem/paging.h"
 #include "mem/vmm.h"
 #include "mem/heap.h"
+#include "arch/x86/cpu.h"
+#include "arch/x86/irq.h"
+#include "sched/sched.h"
+#include "time/time.h"
 
 void gdt_init(void);
-void idt_init(void);
-void pic_remap(void);
-void pic_clear_masks(void);
-void timer_init(void);
 void vga_init(void);
 void vga_write(const char* s);
 void vga_write_u32(u32 value);
-void vga_write_hex(u32 value);
 
 extern u32 __kernel_phys_start;
 extern u32 __kernel_phys_end;
@@ -25,7 +24,6 @@ static void run_mapping_smoke_test(void) {
 
     const u32 test_virt = 0xC2000000U;
     POOS_ASSERT(vmm_map_page(test_virt, frame, PAGE_RW));
-
     *(volatile u32*)test_virt = 0xA5A55A5AU;
 
     u32 translated = 0;
@@ -34,22 +32,42 @@ static void run_mapping_smoke_test(void) {
 
     vmm_unmap_page(test_virt);
     pmm_free_frame(frame);
+}
 
-    vga_write("VMM mapping smoke test passed frame=");
-    vga_write_hex(frame);
-    vga_write("\n");
+static void worker_a(void* arg) {
+    (void)arg;
+    for (;;) {
+        vga_write("A");
+        kthread_sleep(time_ms_to_ticks(200U));
+    }
+}
+
+static void worker_b(void* arg) {
+    (void)arg;
+    for (;;) {
+        vga_write("B");
+        kthread_sleep(time_ms_to_ticks(350U));
+    }
+}
+
+static void ticker(void* arg) {
+    (void)arg;
+    for (;;) {
+        kthread_sleep(time_ms_to_ticks(1000U));
+        vga_write(" ticks=");
+        vga_write_u32(time_ticks());
+        vga_write("\n");
+    }
 }
 
 void kernel_main(struct BootInfo* bootinfo) {
-    interrupts_disable();
+    irq_disable();
 
     vga_init();
-    vga_write("PoOS v0.2 booting...\n");
+    vga_write("PoOS v0.3 booting...\n");
 
     gdt_init();
-    idt_init();
-    pic_remap();
-    pic_clear_masks();
+    irq_init();
 
     bootinfo->kernel_phys_start = (u32)&__kernel_phys_start;
     bootinfo->kernel_phys_end = (u32)&__kernel_phys_end;
@@ -59,13 +77,23 @@ void kernel_main(struct BootInfo* bootinfo) {
     heap_smoke_test();
     run_mapping_smoke_test();
 
-    timer_init();
-    interrupts_enable();
+    time_init();
+    sched_init();
+    pit_init();
 
-    mem_print_summary();
-    vga_write("Entering idle loop.\n");
+    kthread_create("ticker", ticker, 0, 0);
+    kthread_create("workerA", worker_a, 0, 0);
+    kthread_create("workerB", worker_b, 0, 0);
+
+    vga_write("Timer Hz="); vga_write_u32(POOS_TIMER_HZ);
+    vga_write(" timeslice="); vga_write_u32(SCHED_TIMESLICE_TICKS); vga_write("\n");
+    sched_dump_threads();
+    vga_write("Current ticks="); vga_write_u32(time_ticks()); vga_write("\n");
+
+    irq_enable();
+    sched_start();
 
     for (;;) {
-        cpu_halt();
+        cpu_hlt();
     }
 }
