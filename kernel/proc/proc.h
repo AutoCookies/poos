@@ -2,6 +2,7 @@
 #define POOS_PROC_PROC_H
 
 #include "../types.h"
+#include "../vfs/fdtable.h"
 
 #define USER_BASE 0x08048000U
 #define USER_STACK_TOP 0xBFFFE000U
@@ -17,14 +18,21 @@ struct proc {
     u32 entry;
     u32 user_stack_top;
     int exit_code;
+    struct proc* parent;
+    struct fdtable fdt;
     struct proc* next;
 };
 
 void proc_init(void);
-struct proc* proc_create(const char* name);
+struct proc* proc_create(const char* name, struct proc* parent);
 void proc_switch_address_space(struct proc* p);
 void proc_kill_current(int code);
 void proc_reap_zombies(void);
 int proc_spawn_user_image(const char* name, const u8* image, u32 size);
+int proc_spawn_path(const char* path, int* out_pid);
+int proc_exec_path_current(const char* path);
+int proc_waitpid(int pid, int* status);
+struct proc* proc_find(u32 pid);
+int proc_setup_user_stack(struct proc* p, u32* out_esp);
 
 #endif

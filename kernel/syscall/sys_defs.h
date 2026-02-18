@@ -9,6 +9,15 @@ enum {
     SYS_YIELD = 3,
     SYS_SLEEP = 4,
     SYS_GETPID = 5,
+    SYS_OPEN = 6,
+    SYS_CLOSE = 7,
+    SYS_READ = 8,
+    SYS_LSEEK = 9,
+    SYS_STAT = 10,
+    SYS_GETDENTS = 11,
+    SYS_EXECVE = 12,
+    SYS_WAITPID = 13,
+    SYS_SPAWN = 14,
 };
 
 #endif
