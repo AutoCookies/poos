@@ -21,6 +21,7 @@
 #include "tty/tty.h"
 #include "mm/mm.h"
 #include "mm/page.h"
+#include "mm/budget.h"
 #include "blk/blkdev.h"
 #include "blk/part.h"
 #include "bcache/bcache.h"
@@ -63,6 +64,7 @@ void kernel_main(struct BootInfo* bootinfo) {
 
     mem_init(bootinfo);
     mem_sanity_check();
+    mm_budget_init();
     heap_smoke_test();
 
     time_init();

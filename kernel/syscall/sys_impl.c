@@ -18,6 +18,7 @@
 #include "../ns/ns.h"
 #include "../ns/ns_proxy.h"
 #include "../ns/netns.h"
+#include "../mm/budget.h"
 
 void vga_write(const char*);
 
@@ -232,3 +233,10 @@ int sys_clone(u32 flags, struct trapframe* tf){ return proc_clone(flags, tf); }
 int sys_unshare(u32 flags){ return proc_unshare(flags); }
 int sys_seccomp(u32 mode){ struct task* t=task_current(); if(!t||!t->owner||!t->owner->seccomp) return -1; seccomp_init_filter(t->owner->seccomp, mode); audit_log("seccomp.set"); return 0; }
 int sys_cgset(u32 mem,u32 pids,u32 cpu){ struct task* t=task_current(); if(!t||!t->owner||!t->owner->cgrp) return -1; return cgroup_set_limits(t->owner->cgrp,mem,pids,cpu); }
+
+int sys_memstat(void* ubuf, u32 len){
+    struct mm_budget_snapshot st;
+    if(len < sizeof(st)) return -1;
+    mm_budget_snapshot(&st);
+    return copy_to_user(ubuf, &st, sizeof(st));
+}

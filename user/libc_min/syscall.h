@@ -28,6 +28,9 @@ struct netns_pfwd_req {
     unsigned char _pad[3];
 };
 
+struct mem_budget_entry_u { unsigned int cap, used, peak, refused; };
+struct memstat_u { struct mem_budget_entry_u cat[8]; unsigned int dropped_packets, refused_connections, oom_kills; };
+
 static inline int syscall0(int n){int r;__asm__ volatile("int $0x80":"=a"(r):"a"(n):"memory");return r;}
 static inline int syscall1(int n,int a){int r;__asm__ volatile("int $0x80":"=a"(r):"a"(n),"b"(a):"memory");return r;}
 static inline int syscall2(int n,int a,int b){int r;__asm__ volatile("int $0x80":"=a"(r):"a"(n),"b"(a),"c"(b):"memory");return r;}
@@ -64,6 +67,7 @@ int sys_getrandom(void* buf, int len, int flags);
 int sys_time(void);
 int sys_settime(int epoch);
 int sys_clone(int flags); int sys_unshare(int flags); int sys_seccomp(int mode); int sys_cgset(int mem,int pids,int cpu);
+int sys_memstat(struct memstat_u* out, int len);
 
 #endif
 

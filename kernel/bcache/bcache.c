@@ -1,5 +1,6 @@
 #include "bcache.h"
 #include "../mem/mem.h"
+#include "../mm/budget.h"
 
 #define BCACHE_NBUF 256
 static struct bcache_buf g_bufs[BCACHE_NBUF];
@@ -7,7 +8,7 @@ static u32 g_tick; static struct bcache_stats g_stats;
 
 static int flush_one(struct bcache_buf* b){ if(!b->valid||!b->dirty) return 0; if(blk_write(b->dev,b->idx*8,8,b->data)<0) return -1; b->dirty=0; g_stats.writebacks++; return 0; }
 
-void bcache_init(void){ mem_set(g_bufs,0,sizeof(g_bufs)); mem_set(&g_stats,0,sizeof(g_stats)); g_tick=1; }
+void bcache_init(void){ mem_set(g_bufs,0,sizeof(g_bufs)); mem_set(&g_stats,0,sizeof(g_stats)); g_tick=1; mm_budget_set_used(MM_BUDGET_BUFFER_CACHE, sizeof(g_bufs)); }
 
 struct bcache_buf* bcache_get(struct blkdev* dev, u32 idx){
     struct bcache_buf* freeb=0; struct bcache_buf* lru=0;

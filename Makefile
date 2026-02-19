@@ -9,6 +9,19 @@ CFLAGS := -std=c11 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -Wa
 LDFLAGS := -T linker.ld -nostdlib -m elf_i386
 U_CFLAGS := -std=c11 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -m32 -O2 -Wall -Wextra -Werror
 
+PROFILE ?= edge80
+ifeq ($(PROFILE),edge80)
+CFLAGS += -DCONFIG_EDGE_80MB=1 -DCONFIG_LEAN_SERVER=1
+U_CFLAGS += -DCONFIG_EDGE_80MB=1 -DCONFIG_LEAN_SERVER=1
+EDGE_PROFILE := 1
+else ifeq ($(PROFILE),lean)
+CFLAGS += -DCONFIG_LEAN_SERVER=1
+U_CFLAGS += -DCONFIG_LEAN_SERVER=1
+else
+CFLAGS += -DCONFIG_FULL=1
+U_CFLAGS += -DCONFIG_FULL=1
+endif
+
 BUILD_DIR := build
 BOOT_BIN := $(BUILD_DIR)/boot.bin
 KERNEL_ELF := $(BUILD_DIR)/kernel.elf
@@ -19,7 +32,7 @@ INITRD_TAR := $(BUILD_DIR)/initrd.tar
 
 INITRD_LBA := 300
 
-USER_APPS := init sh ls cat hello sleep fault cowtest mmaptest filemaptest mkdir rm mv cp sync ifconfig ping udpsend udprecv dnslookup httpget httpsget tlsprobe tcptest schedtest iotest nettest mmtest cpustat ps iostat locks login su id chmod chown umask passwd poosrun netnsctl
+USER_APPS := init sh ls cat hello sleep fault cowtest mmaptest filemaptest mkdir rm mv cp sync ifconfig ping udpsend udprecv dnslookup httpget httpsget tlsprobe tcptest schedtest iotest nettest mmtest cpustat ps iostat locks login su id chmod chown umask passwd poosrun netnsctl memstat
 USER_ELFS := $(patsubst %,$(BUILD_DIR)/user/%.elf,$(USER_APPS))
 USER_COMMON_OBJS := $(BUILD_DIR)/user/crt0.o $(BUILD_DIR)/user/libc_min/syscall.o $(BUILD_DIR)/user/libc_min/printf_min.o $(BUILD_DIR)/user/libc_min/string.o
 
@@ -50,7 +63,7 @@ KERNEL_C_SRCS := \
 	kernel/fs/fat/fat.c kernel/fs/fat/fat_dir.c kernel/fs/fat/fat_file.c kernel/fs/fat/fat_alloc.c kernel/fs/fat/fat_debug.c \
 	kernel/ipc/ringbuf.c kernel/ipc/pipe.c kernel/tty/tty.c kernel/tty/kbd.c kernel/tty/console.c \
 	kernel/proc/signal.c kernel/proc/proc_table.c kernel/proc/fork.c kernel/proc/thread_user.c kernel/proc/mm_clone.c \
-	kernel/mm/addrspace.c kernel/mm/vma.c kernel/mm/page.c kernel/mm/cow.c kernel/mm/mmap.c kernel/mm/faults_vm.c kernel/mm/pagecache.c kernel/mm/anon.c kernel/mm/filemap.c kernel/mm/tlb.c kernel/mm/mm_debug.c \
+	kernel/mm/addrspace.c kernel/mm/vma.c kernel/mm/page.c kernel/mm/cow.c kernel/mm/mmap.c kernel/mm/faults_vm.c kernel/mm/pagecache.c kernel/mm/anon.c kernel/mm/filemap.c kernel/mm/tlb.c kernel/mm/mm_debug.c kernel/mm/budget.c \
 	kernel/pci/pci.c kernel/net/net.c kernel/net/net_timer.c kernel/net/net_stats.c kernel/net/netif.c kernel/net/pbuf.c kernel/net/checksum.c kernel/net/eth.c kernel/net/arp.c kernel/net/ipv4.c kernel/net/icmp.c kernel/net/udp.c kernel/net/dhcp.c kernel/net/dns.c kernel/net/route.c kernel/net/sock.c kernel/net/sock_api.c kernel/net/net_debug.c kernel/net/tcp/tcp.c kernel/net/tcp/tcp_state.c kernel/net/tcp/tcp_input.c kernel/net/tcp/tcp_output.c kernel/net/tcp/tcp_timer.c kernel/net/tcp/tcp_retransmit.c kernel/net/tcp/tcp_window.c kernel/net/tcp/tcp_conn.c kernel/net/tcp/tcp_sock.c kernel/net/tcp/tcp_debug.c kernel/drivers/rtl8139.c kernel/drivers/virtio_net.c kernel/dev/devnet.c \
 	kernel/crypto/memwipe.c kernel/crypto/constant_time.c kernel/crypto/rng.c kernel/crypto/sha256.c kernel/crypto/hmac.c kernel/crypto/hkdf.c
 
@@ -60,6 +73,10 @@ KERNEL_OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(KERNEL_C_SRCS)) $(patsubst %.as
 
 .PHONY: build run clean
 build: $(IMAGE) $(DATA_IMAGE)
+
+.PHONY: edge80
+edge80:
+	$(MAKE) PROFILE=edge80 build
 
 $(IMAGE): $(BOOT_BIN) $(KERNEL_BIN) $(INITRD_TAR)
 	mkdir -p $(BUILD_DIR)
@@ -94,6 +111,7 @@ $(INITRD_TAR): $(USER_ELFS) user/pack/mkinitrd.sh
 	cp $(BUILD_DIR)/user/httpsget.elf user/pack/rootfs/bin/httpsget
 	cp $(BUILD_DIR)/user/tlsprobe.elf user/pack/rootfs/bin/tlsprobe
 	cp $(BUILD_DIR)/user/tcptest.elf user/pack/rootfs/bin/tcptest
+	cp $(BUILD_DIR)/user/memstat.elf user/pack/rootfs/bin/memstat
 	cp $(BUILD_DIR)/user/schedtest.elf user/pack/rootfs/bin/schedtest
 	cp $(BUILD_DIR)/user/iotest.elf user/pack/rootfs/bin/iotest
 	cp $(BUILD_DIR)/user/nettest.elf user/pack/rootfs/bin/nettest
