@@ -159,9 +159,28 @@ run-headless-log: iso
 
 run-headless-once: iso
 	@mkdir -p $(BUILD_DIR)
-	@rm -f $(BUILD_DIR)/qemu_debugcon.log $(BUILD_DIR)/qemu_guest_errors.log
+	@rm -f $(BUILD_DIR)/qemu_debugcon.log $(BUILD_DIR)/qemu_guest_errors.log $(BUILD_DIR)/qemu_run.log
 	@echo "[run-headless-once] running qemu for up to 12s..."
-	@set -e; 	$(QEMU) -m 80M -smp 1 -no-reboot -no-shutdown -display none -serial none -debugcon file:$(BUILD_DIR)/qemu_debugcon.log -global isa-debugcon.iobase=0xe9 -d guest_errors -D $(BUILD_DIR)/qemu_guest_errors.log -drive format=raw,file=$(ISO),if=ide,index=0 -drive format=raw,file=$(DATA_IMAGE),if=ide,index=1 -netdev user,id=n1,hostfwd=udp::5555-:5555 -device rtl8139,netdev=n1 >/dev/null 2>&1 & 	qpid=$$!; 	for i in $$(seq 1 12); do sleep 1; if ! kill -0 $$qpid 2>/dev/null; then break; fi; done; 	kill $$qpid >/dev/null 2>&1 || true; wait $$qpid >/dev/null 2>&1 || true; 	echo "[run-headless-once] debugcon log:"; 	cat $(BUILD_DIR)/qemu_debugcon.log 2>/dev/null || true; 	echo "[run-headless-once] guest errors (tail):"; 	tail -n 40 $(BUILD_DIR)/qemu_guest_errors.log 2>/dev/null || true
+	@set -eu; \
+	$(QEMU) -m 80M -smp 1 -no-reboot -no-shutdown -display none -serial none \
+	  -debugcon file:$(BUILD_DIR)/qemu_debugcon.log -global isa-debugcon.iobase=0xe9 \
+	  -d guest_errors -D $(BUILD_DIR)/qemu_guest_errors.log \
+	  -drive format=raw,file=$(ISO),if=ide,index=0 \
+	  -drive format=raw,file=$(DATA_IMAGE),if=ide,index=1 \
+	  -netdev user,id=n1,hostfwd=udp::5555-:5555 -device rtl8139,netdev=n1 \
+	  >$(BUILD_DIR)/qemu_run.log 2>&1 & \
+	qpid=$$!; \
+	for i in $$(seq 1 12); do sleep 1; if ! kill -0 $$qpid 2>/dev/null; then break; fi; done; \
+	kill $$qpid >/dev/null 2>&1 || true; \
+	wait $$qpid >/dev/null 2>&1 || true; \
+	echo "[run-headless-once] qemu stdout/stderr (tail):"; \
+	tail -n 40 $(BUILD_DIR)/qemu_run.log 2>/dev/null || true; \
+	echo "[run-headless-once] debugcon bytes:"; \
+	wc -c $(BUILD_DIR)/qemu_debugcon.log 2>/dev/null || true; \
+	echo "[run-headless-once] debugcon log:"; \
+	cat $(BUILD_DIR)/qemu_debugcon.log 2>/dev/null || true; \
+	echo "[run-headless-once] guest errors (tail):"; \
+	tail -n 40 $(BUILD_DIR)/qemu_guest_errors.log 2>/dev/null || true
 
 test-full-build:
 	@tools/test_full_build.sh

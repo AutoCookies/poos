@@ -41,6 +41,8 @@ Boot-stage debug markers written by the bootloader to debugcon are:
 - `J` jumping to kernel entry
 - `!` entered bootloader hang loop
 
+If `run-headless-once` prints an empty debugcon log, check `build/qemu_run.log` first; that captures QEMU startup/runtime errors (e.g. missing acceleration/device issues) that would otherwise look like a silent hang.
+
 Equivalent manual command:
 
 ```sh
