@@ -87,7 +87,7 @@ KERNEL_C_SRCS := \
 KERNEL_ASM_SRCS := kernel/entry.asm kernel/arch/x86/isr_stubs.asm kernel/arch/x86/ring3.asm kernel/arch/x86/syscall_stub.asm kernel/sched/context_switch.asm kernel/arch/x86/smp/start_ap.asm
 KERNEL_OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(KERNEL_C_SRCS)) $(patsubst %.asm,$(BUILD_DIR)/%.o,$(KERNEL_ASM_SRCS))
 
-.PHONY: all clean kernel user rootfs initrd iso verify-iso run run-headless test-full-build toolchain-check
+.PHONY: all clean kernel user rootfs initrd iso verify-iso run run-headless run-headless-log run-headless-once test-full-build toolchain-check
 all: iso
 
 toolchain-check:
@@ -150,7 +150,18 @@ run: iso
 	$(QEMU) -drive format=raw,file=$(ISO),if=ide,index=0 -drive format=raw,file=$(DATA_IMAGE),if=ide,index=1 -netdev user,id=n1,hostfwd=udp::5555-:5555 -device rtl8139,netdev=n1
 
 run-headless: iso
-	$(QEMU) -m 80M -smp 1 -no-reboot -no-shutdown -display none -serial none -debugcon stdio -global isa-debugcon.iobase=0xe9 -drive format=raw,file=$(ISO),if=ide,index=0 -drive format=raw,file=$(DATA_IMAGE),if=ide,index=1 -netdev user,id=n1,hostfwd=udp::5555-:5555 -device rtl8139,netdev=n1
+	$(QEMU) -m 80M -smp 1 -no-reboot -no-shutdown -display none -serial none -debugcon stdio -global isa-debugcon.iobase=0xe9 -d guest_errors -D $(BUILD_DIR)/qemu_guest_errors.log -drive format=raw,file=$(ISO),if=ide,index=0 -drive format=raw,file=$(DATA_IMAGE),if=ide,index=1 -netdev user,id=n1,hostfwd=udp::5555-:5555 -device rtl8139,netdev=n1
+
+run-headless-log: iso
+	@mkdir -p $(BUILD_DIR)
+	@echo "[run-headless-log] debugcon=$(BUILD_DIR)/qemu_debugcon.log guest_errors=$(BUILD_DIR)/qemu_guest_errors.log"
+	$(QEMU) -m 80M -smp 1 -no-reboot -no-shutdown -display none -serial none -debugcon file:$(BUILD_DIR)/qemu_debugcon.log -global isa-debugcon.iobase=0xe9 -d guest_errors -D $(BUILD_DIR)/qemu_guest_errors.log -drive format=raw,file=$(ISO),if=ide,index=0 -drive format=raw,file=$(DATA_IMAGE),if=ide,index=1 -netdev user,id=n1,hostfwd=udp::5555-:5555 -device rtl8139,netdev=n1
+
+run-headless-once: iso
+	@mkdir -p $(BUILD_DIR)
+	@rm -f $(BUILD_DIR)/qemu_debugcon.log $(BUILD_DIR)/qemu_guest_errors.log
+	@echo "[run-headless-once] running qemu for up to 12s..."
+	@set -e; 	$(QEMU) -m 80M -smp 1 -no-reboot -no-shutdown -display none -serial none -debugcon file:$(BUILD_DIR)/qemu_debugcon.log -global isa-debugcon.iobase=0xe9 -d guest_errors -D $(BUILD_DIR)/qemu_guest_errors.log -drive format=raw,file=$(ISO),if=ide,index=0 -drive format=raw,file=$(DATA_IMAGE),if=ide,index=1 -netdev user,id=n1,hostfwd=udp::5555-:5555 -device rtl8139,netdev=n1 >/dev/null 2>&1 & 	qpid=$$!; 	for i in $$(seq 1 12); do sleep 1; if ! kill -0 $$qpid 2>/dev/null; then break; fi; done; 	kill $$qpid >/dev/null 2>&1 || true; wait $$qpid >/dev/null 2>&1 || true; 	echo "[run-headless-once] debugcon log:"; 	cat $(BUILD_DIR)/qemu_debugcon.log 2>/dev/null || true; 	echo "[run-headless-once] guest errors (tail):"; 	tail -n 40 $(BUILD_DIR)/qemu_guest_errors.log 2>/dev/null || true
 
 test-full-build:
 	@tools/test_full_build.sh

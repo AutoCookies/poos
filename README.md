@@ -25,9 +25,21 @@ Boot in QEMU (recommended):
 make run
 # or headless debug output:
 make run-headless
+# logs to files (no GUI):
+make run-headless-log
+# auto-stop after ~12s and print logs:
+make run-headless-once
 ```
 
 `run-headless` is expected to keep the terminal attached and print debug output; it does **not** open a QEMU window.
+
+Boot-stage debug markers written by the bootloader to debugcon are:
+- `A` start in real mode
+- `P` entered protected mode
+- `K/k` before/after kernel read
+- `I/i` before/after initrd read
+- `J` jumping to kernel entry
+- `!` entered bootloader hang loop
 
 Equivalent manual command:
 

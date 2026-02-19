@@ -28,6 +28,8 @@ start:
     mov sp, REALMODE_STACK
 
     mov [boot_drive], dl
+    mov al, 'A'
+    call dbg_putc
 
     call build_bootinfo
     call enable_a20
@@ -80,6 +82,8 @@ build_bootinfo:
 
 [bits 32]
 protected_mode_entry:
+    mov al, 'P'
+    call dbg_putc
     mov ax, 0x10
     mov ds, ax
     mov es, ax
@@ -88,22 +92,34 @@ protected_mode_entry:
     mov ss, ax
     mov esp, PMODE_STACK
 
+    mov al, 'K'
+    call dbg_putc
     mov dl, [boot_drive]
     mov eax, KERNEL_LBA_START
     mov ecx, KERNEL_SECTORS
     mov edi, KERNEL_LOAD_ADDR
     call ata_lba_read
+    mov al, 'k'
+    call dbg_putc
 
+    mov al, 'I'
+    call dbg_putc
     mov dl, [boot_drive]
     mov eax, INITRD_LBA_START
     mov ecx, INITRD_SECTORS
     mov edi, INITRD_LOAD_ADDR
     call ata_lba_read
+    mov al, 'i'
+    call dbg_putc
 
     mov eax, BOOTINFO_ADDR
+    mov al, 'J'
+    call dbg_putc
     jmp 0x08:KERNEL_LOAD_ADDR
 
 hang:
+    mov al, '!'
+    call dbg_putc
     cli
     hlt
     jmp hang
@@ -189,6 +205,11 @@ ata_wait_drq:
     jnz hang
     jmp .wait2
 .ready:
+    ret
+
+dbg_putc:
+    mov dx, 0xE9
+    out dx, al
     ret
 
 %include "boot/gdt.asm"
