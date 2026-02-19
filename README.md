@@ -35,8 +35,7 @@ make run-headless-once
 
 Boot-stage debug markers written by the bootloader to debugcon are:
 - `P` entered protected mode
-- `K/k` before/after kernel read
-- `I/i` before/after initrd read
+- `I` before initrd read
 - `J` jumping to kernel entry
 - `!` entered bootloader hang loop
 

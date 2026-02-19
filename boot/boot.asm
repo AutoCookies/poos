@@ -90,15 +90,11 @@ protected_mode_entry:
     mov ss, ax
     mov esp, PMODE_STACK
 
-    mov al, 'K'
-    call dbg_putc
     mov dl, [boot_drive]
     mov eax, KERNEL_LBA_START
     mov ecx, KERNEL_SECTORS
     mov edi, KERNEL_LOAD_ADDR
     call ata_lba_read
-    mov al, 'k'
-    call dbg_putc
 
     mov al, 'I'
     call dbg_putc
@@ -107,8 +103,6 @@ protected_mode_entry:
     mov ecx, INITRD_SECTORS
     mov edi, INITRD_LOAD_ADDR
     call ata_lba_read
-    mov al, 'i'
-    call dbg_putc
 
     mov eax, BOOTINFO_ADDR
     mov al, 'J'
@@ -137,7 +131,7 @@ ata_lba_read:
 .next_sector:
     test ecx, ecx
     jz .done
-    call ata_wait_not_busy
+    call ata_wait_ready
 
     mov dx, 0x1F2
     mov al, 1
@@ -162,6 +156,7 @@ ata_lba_read:
     and bh, 0x0F
     or al, bh
     out dx, al
+    call ata_io_delay
 
     mov dx, 0x1F7
     mov al, 0x20
@@ -185,6 +180,24 @@ ata_lba_read:
     popad
     ret
 
+ata_io_delay:
+    mov dx, 0x3F6
+    in al, dx
+    in al, dx
+    in al, dx
+    in al, dx
+    ret
+
+ata_wait_ready:
+    mov dx, 0x1F7
+.waitr:
+    in al, dx
+    test al, 0x80
+    jnz .waitr
+    test al, 0x40
+    jz .waitr
+    ret
+
 ata_wait_not_busy:
     mov dx, 0x1F7
 .wait1:
@@ -197,12 +210,12 @@ ata_wait_drq:
     mov dx, 0x1F7
 .wait2:
     in al, dx
-    test al, 0x08
-    jnz .ready
+    test al, 0x80
+    jnz .wait2
     test al, 0x01
     jnz hang
-    jmp .wait2
-.ready:
+    test al, 0x08
+    jz .wait2
     ret
 
 dbg_putc:
