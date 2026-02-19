@@ -513,3 +513,28 @@ proxyd --listen 443 --upstream 10.42.0.2:8080 --cache-mem 8M --cache-disk 32M --
 - Use `--stats` to print bounded cache counters.
 - Current transport path is upstream client mode (`GET`) with fixed memory buffers and no dynamic allocation.
 - `--listen` is accepted for forward-compatibility but currently informational due to kernel socket API limits (no listen/accept syscall yet).
+
+## PoOS Phase 17 Edge80-Prox readiness
+
+- Boot now prefers `/bin/edge` from `init` and falls back to `login` if unavailable.
+- `edge` runs a tiny crash-only supervisor for `proxyd` with restart backoff (50ms→1s), restart storm detection, and status persistence in `/tmp/edge.status`.
+- Supervisor controls:
+  - `edge svc status`
+  - `edge svc list`
+  - `edge svc restart proxyd`
+- Proxy config file: `/etc/edge/proxyd.conf` (line-based `key = value`).
+- Reload workflow:
+  - `proxyd --reload` writes a bounded reload request.
+  - Daemon applies parse+validate+swap atomically and retains old config on failure.
+- Hardening knobs include bounded request/header limits, per-IP token-bucket rate limiting, timeout accounting, and shed-load behavior on low memory.
+- Observability commands:
+  - `proxystat` (reads bounded counter snapshot)
+  - `memstat`
+  - `healthcheck` (`OK`, `DEGRADED`, `FAIL`)
+- Benchmark + report:
+  - `edge run-golden`
+  - Runs health + bench workflow and writes `/var/log/edge-report.json` (fallback `/tmp/edge-report.json`).
+- Default 80MB tuning:
+  - `max_conns=64`, `max_tls_conns=32`
+  - `cache_mem=8M`, `cache_disk=32M`
+  - `timeout_header_ms=3000`, `timeout_idle_ms=15000`, `timeout_upstream_ms=1500`
