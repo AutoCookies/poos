@@ -3,6 +3,7 @@ extern int printf_min(const char*, ...);
 
 static struct edge_service_info g_svcs[EDGE_MAX_SERVICES];
 static int g_nsvc = 0;
+static unsigned int g_next_tune_poll_ms = 0;
 
 static void sset(char* d,const char* s,int cap){ int i=0; for(;i<cap-1 && s[i];i++) d[i]=s[i]; d[i]=0; }
 static int seq(const char* a,const char* b){ int i=0; for(;;i++){ if(a[i]!=b[i]) return 0; if(!a[i]) return 1; } }
@@ -47,6 +48,7 @@ static void svc_maybe_restart(struct edge_service_info* s, unsigned int now_ms){
 
 void svc_supervisor_tick(void){
     unsigned int now_ms = edge_now_ms();
+    if(now_ms >= g_next_tune_poll_ms){ edge_tune_tick(now_ms); g_next_tune_poll_ms = now_ms + edge_tune_poll_ms(); }
     for(int i=0;i<g_nsvc;i++) svc_maybe_restart(&g_svcs[i], now_ms);
 }
 

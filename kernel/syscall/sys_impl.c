@@ -19,6 +19,8 @@
 #include "../ns/ns_proxy.h"
 #include "../ns/netns.h"
 #include "../mm/budget.h"
+#include "../mem/pmm.h"
+#include "../mm/ram_ladder.h"
 
 void vga_write(const char*);
 
@@ -234,9 +236,65 @@ int sys_unshare(u32 flags){ return proc_unshare(flags); }
 int sys_seccomp(u32 mode){ struct task* t=task_current(); if(!t||!t->owner||!t->owner->seccomp) return -1; seccomp_init_filter(t->owner->seccomp, mode); audit_log("seccomp.set"); return 0; }
 int sys_cgset(u32 mem,u32 pids,u32 cpu){ struct task* t=task_current(); if(!t||!t->owner||!t->owner->cgrp) return -1; return cgroup_set_limits(t->owner->cgrp,mem,pids,cpu); }
 
+
+
+struct meminfo_k { u32 total_bytes; u32 free_bytes; };
+
+static u32 g_sysctl[64];
+
+static void sysctl_defaults_init(void) {
+    if (g_sysctl[SYSCTL_NET_MAX_CONNS] != 0) return;
+    g_sysctl[SYSCTL_NET_MAX_CONNS] = 64;
+    g_sysctl[SYSCTL_NET_MAX_TLS_CONNS] = 32;
+    g_sysctl[SYSCTL_NET_TCP_BUF_CAP] = 16U * 1024U;
+    g_sysctl[SYSCTL_NET_TLS_RECORD_CAP] = 4U * 1024U;
+    g_sysctl[SYSCTL_PROXY_CACHE_MEM_CAP] = 8U * 1024U * 1024U;
+    g_sysctl[SYSCTL_PROXY_CACHE_DISK_CAP] = 32U * 1024U * 1024U;
+    g_sysctl[SYSCTL_PROXY_KEEPALIVE_MS] = 12000;
+    g_sysctl[SYSCTL_VM_PAGE_CACHE_CAP] = 8U * 1024U * 1024U;
+    g_sysctl[SYSCTL_VM_BCACHE_CAP] = 8U * 1024U * 1024U;
+    g_sysctl[SYSCTL_MM_SLAB_CAP] = 10U * 1024U * 1024U;
+    g_sysctl[SYSCTL_EDGE_LOG_LEVEL] = 1;
+    g_sysctl[SYSCTL_EDGE_TIER_MB] = 80;
+}
+
+static int sysctl_valid_key(u32 key) {
+    return key >= SYSCTL_NET_MAX_CONNS && key <= SYSCTL_EDGE_TIER_MB;
+}
+
 int sys_memstat(void* ubuf, u32 len){
     struct mm_budget_snapshot st;
     if(len < sizeof(st)) return -1;
     mm_budget_snapshot(&st);
     return copy_to_user(ubuf, &st, sizeof(st));
+}
+
+
+int sys_meminfo(void* ubuf, u32 len){
+    if (len < sizeof(struct meminfo_k)) return -1;
+    struct PmmStats st = pmm_get_stats();
+    struct meminfo_k out;
+    out.total_bytes = st.total_frames * PMM_PAGE_SIZE;
+    out.free_bytes = st.free_frames * PMM_PAGE_SIZE;
+    return copy_to_user(ubuf, &out, sizeof(out));
+}
+
+int sys_sysctl(u32 op, u32 key, u32* uvalue){
+    struct cred* c = cred_current();
+    u32 v = 0;
+    sysctl_defaults_init();
+    if (!sysctl_valid_key(key) || !uvalue) return -1;
+    if (op == 0) {
+        v = g_sysctl[key];
+        return copy_to_user(uvalue, &v, sizeof(v));
+    }
+    if (!c || !cred_has_cap(c, CAP_SYS_ADMIN)) return -1;
+    if (copy_from_user(&v, uvalue, sizeof(v)) < 0) return -1;
+    g_sysctl[key] = v;
+    if (key == SYSCTL_VM_PAGE_CACHE_CAP) mm_budget_set_cap(MM_BUDGET_PAGE_CACHE, v);
+    else if (key == SYSCTL_VM_BCACHE_CAP) mm_budget_set_cap(MM_BUDGET_BUFFER_CACHE, v);
+    else if (key == SYSCTL_MM_SLAB_CAP) mm_budget_set_cap(MM_BUDGET_SLAB, v);
+    else if (key == SYSCTL_NET_MAX_CONNS) mm_budget_set_cap(MM_BUDGET_NETWORK, v * 64U * 1024U);
+    else if (key == SYSCTL_NET_MAX_TLS_CONNS) mm_budget_set_cap(MM_BUDGET_TLS, v * 64U * 1024U);
+    return 0;
 }

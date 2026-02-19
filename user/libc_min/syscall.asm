@@ -237,7 +237,7 @@ sys_settime: mov eax,46
              mov ebx,[esp+4]
              int 0x80
              ret
-global sys_clone, sys_unshare, sys_seccomp, sys_cgset, sys_memstat
+global sys_clone, sys_unshare, sys_seccomp, sys_cgset, sys_memstat, sys_meminfo, sys_sysctl
 sys_clone: mov eax,47
            mov ebx,[esp+4]
            int 0x80
@@ -262,3 +262,17 @@ sys_memstat: mov eax,51
              mov ecx,[esp+8]
              int 0x80
              ret
+
+
+sys_meminfo: mov eax,52
+             mov ebx,[esp+4]
+             mov ecx,[esp+8]
+             int 0x80
+             ret
+
+sys_sysctl: mov eax,53
+            mov ebx,[esp+4]
+            mov ecx,[esp+8]
+            mov edx,[esp+12]
+            int 0x80
+            ret

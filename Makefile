@@ -37,7 +37,7 @@ USER_ELFS := $(patsubst %,$(BUILD_DIR)/user/%.elf,$(USER_APPS))
 USER_COMMON_OBJS := $(BUILD_DIR)/user/crt0.o $(BUILD_DIR)/user/libc_min/syscall.o $(BUILD_DIR)/user/libc_min/printf_min.o $(BUILD_DIR)/user/libc_min/string.o
 PROXYD_SRCS := proxyd proxy_conn proxy_http1 proxy_tls proxy_cache_mem proxy_cache_disk proxy_eviction proxy_limits proxy_timeouts proxy_ratelimit proxy_health proxy_reload proxy_stats proxy_log
 PROXYD_OBJS := $(patsubst %,$(BUILD_DIR)/user/apps/proxyd/%.o,$(PROXYD_SRCS))
-EDGE_SRCS := init_edge svc_supervisor svc_config svc_health edge_bench edge_report edge_limits edge_time edge_health
+EDGE_SRCS := init_edge svc_supervisor svc_config svc_health edge_bench edge_report edge_limits edge_time edge_health edge_tune
 EDGE_OBJS := $(patsubst %,$(BUILD_DIR)/user/apps/edge/%.o,$(EDGE_SRCS))
 
 KERNEL_C_SRCS := \

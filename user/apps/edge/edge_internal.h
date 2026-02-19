@@ -16,6 +16,20 @@ struct edge_health_state {
     unsigned int low_mem_ticks;
 };
 
+
+struct edge_tune_state {
+    unsigned int ram_total_mb;
+    unsigned int tier_mb;
+    unsigned int max_conns_cur;
+    unsigned int min_free_mb;
+    unsigned int runtime_degrade_events;
+    unsigned int shed_load_count;
+    unsigned int cooldown_until_ms;
+    int tier;
+    int pressure_level;
+};
+extern struct edge_tune_state g_edge_tune;
+
 struct edge_service_info {
     char name[16];
     char path[32];
@@ -41,5 +55,9 @@ int svc_supervisor_snapshot(struct edge_service_info** out);
 int edge_bench_run(void);
 int edge_report_write(void);
 int edge_healthcheck(int verbose);
+int edge_tune_bootstrap(int forced_tier_mb);
+void edge_tune_tick(unsigned int now_ms);
+unsigned int edge_tune_poll_ms(void);
+
 
 #endif

@@ -1,5 +1,6 @@
 #include "proxy_cache.h"
 #include "../../libc_min/syscall.h"
+#include "../../../kernel/mm/ram_ladder.h"
 extern int printf_min(const char*, ...);
 
 extern int proxy_reload_requested(void);
@@ -18,6 +19,8 @@ static struct proxyd_cfg g_cfg = {8192,2048,3000,15000,1500,10000,64,32,20,40};
 
 static int seq(const char* a,const char* b){ int i=0; for(;;i++){ if(a[i]!=b[i]) return 0; if(!a[i]) return 1; } }
 static int parse_i(const char* s){ int n=0; int i=0; while(s[i]==' '||s[i]=='\t') i++; for(;s[i]>='0'&&s[i]<='9';i++) n=n*10+(s[i]-'0'); return n; }
+
+static unsigned int get_ctl(int key, unsigned int def){ unsigned int v=def; if(sys_sysctl(0,key,&v)<0) return def; return v; }
 
 static int parse_cfg(struct proxyd_cfg* out){
     int fd=sys_open("/etc/edge/proxyd.conf",O_RDONLY); if(fd<0) return -1;
@@ -68,15 +71,22 @@ int main(int argc, char** argv){
     for(;;){
         struct proxy_runtime_stats* st=proxy_stats_mut();
         maybe_reload();
-        st->conns_current = (st->conns_current+1)%(unsigned int)g_cfg.max_conns;
+        unsigned int ctl_max = get_ctl(SYSCTL_NET_MAX_CONNS,(unsigned int)g_cfg.max_conns);
+        unsigned int ctl_tls = get_ctl(SYSCTL_NET_MAX_TLS_CONNS,(unsigned int)g_cfg.max_tls_conns);
+        unsigned int refuse_tls = get_ctl(SYSCTL_EDGE_REFUSE_NEW_TLS,0);
+        unsigned int disable_cache = get_ctl(SYSCTL_PROXY_DISABLE_NEW_CACHE,0);
+        unsigned int force_shed = get_ctl(SYSCTL_PROXY_SHED_LOAD,0);
+        if(ctl_max<8) ctl_max=8;
+        st->conns_current = (st->conns_current+1)%ctl_max;
         if(st->conns_current>st->conns_peak) st->conns_peak=st->conns_current;
-        if(proxy_shed_load()){ st->shed_load_count++; st->req_5xx++; }
+        if(refuse_tls && st->tls_handshake_ok>=ctl_tls){ st->tls_handshake_fail++; }
+        if(force_shed || proxy_shed_load()){ st->shed_load_count++; st->req_5xx++; }
         else if(!proxy_ratelimit_allow(0x7f000001u,(unsigned int)sys_time(),(unsigned int)g_cfg.rate_limit_rps,(unsigned int)g_cfg.rate_limit_burst)){ st->rate_limited_count++; st->req_4xx++; }
         else {
             int v=proxy_validate_request_line("GET","/index.html",16,g_cfg.req_line_max);
             int h=proxy_header_guard(512,8,g_cfg.req_hdr_max,64);
             if(v||h){ st->req_4xx++; }
-            else st->req_ok++;
+            else { st->req_ok++; if(!disable_cache) st->cache_hit++; else st->cache_miss++; }
         }
         { unsigned int now_ms=(unsigned int)sys_time()*1000u; if(now_ms-start > (unsigned int)g_cfg.total_timeout_ms) { st->timeouts_count++; start=now_ms; } }
         proxy_stats_write_file();

@@ -52,6 +52,13 @@ void mm_budget_set_used(enum mm_budget_cat cat, u32 bytes) {
     if (e->used > e->peak) e->peak = e->used;
 }
 
+void mm_budget_set_cap(enum mm_budget_cat cat, u32 cap) {
+    if (cat >= MM_BUDGET_COUNT) return;
+    struct mm_budget_entry* e = &g_budget.cat[cat];
+    e->cap = cap;
+    if (e->used > e->cap) e->used = e->cap;
+}
+
 void mm_budget_inc_drop_packets(void) { g_budget.dropped_packets++; }
 void mm_budget_inc_refused_connections(void) { g_budget.refused_connections++; }
 void mm_budget_inc_oom_kills(void) { g_budget.oom_kills++; }
