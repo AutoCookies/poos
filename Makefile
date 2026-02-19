@@ -19,7 +19,7 @@ INITRD_TAR := $(BUILD_DIR)/initrd.tar
 
 INITRD_LBA := 300
 
-USER_APPS := init sh ls cat hello sleep fault cowtest mmaptest filemaptest mkdir rm mv cp sync ifconfig ping udpsend udprecv dnslookup httpget httpsget tlsprobe tcptest schedtest iotest nettest mmtest cpustat ps iostat locks login su id chmod chown umask passwd poosrun
+USER_APPS := init sh ls cat hello sleep fault cowtest mmaptest filemaptest mkdir rm mv cp sync ifconfig ping udpsend udprecv dnslookup httpget httpsget tlsprobe tcptest schedtest iotest nettest mmtest cpustat ps iostat locks login su id chmod chown umask passwd poosrun netnsctl
 USER_ELFS := $(patsubst %,$(BUILD_DIR)/user/%.elf,$(USER_APPS))
 USER_COMMON_OBJS := $(BUILD_DIR)/user/crt0.o $(BUILD_DIR)/user/libc_min/syscall.o $(BUILD_DIR)/user/libc_min/printf_min.o $(BUILD_DIR)/user/libc_min/string.o
 
@@ -110,6 +110,7 @@ $(INITRD_TAR): $(USER_ELFS) user/pack/mkinitrd.sh
 	cp $(BUILD_DIR)/user/umask.elf user/pack/rootfs/bin/umask
 	cp $(BUILD_DIR)/user/passwd.elf user/pack/rootfs/bin/passwd
 	cp $(BUILD_DIR)/user/poosrun.elf user/pack/rootfs/bin/poosrun
+	cp $(BUILD_DIR)/user/netnsctl.elf user/pack/rootfs/bin/netnsctl
 	user/pack/mkinitrd.sh user/pack/rootfs $(INITRD_TAR)
 
 $(BOOT_BIN): boot/boot.asm boot/gdt.asm

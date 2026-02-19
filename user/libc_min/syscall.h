@@ -16,6 +16,18 @@ struct vdirent { unsigned int ino, type; char name[32]; };
 struct sockaddr_in_k { unsigned short family, port; unsigned int addr; };
 struct netinfo_u { unsigned char mac[6]; unsigned int ip,mask,gw,dns,rx,tx,drops; };
 
+struct netns_diag_u {
+    unsigned int nsid, bridge_ip, bridge_mask, container_ip, nat_enabled;
+    char veth_host[8], veth_peer[8], bridge[8];
+    unsigned int bridge_rx, bridge_tx, nat_pkts, nat_bytes, pfwd_hits, drops;
+};
+struct netns_pfwd_req {
+    unsigned short host_port, container_port;
+    unsigned int container_ip;
+    unsigned char proto;
+    unsigned char _pad[3];
+};
+
 static inline int syscall0(int n){int r;__asm__ volatile("int $0x80":"=a"(r):"a"(n):"memory");return r;}
 static inline int syscall1(int n,int a){int r;__asm__ volatile("int $0x80":"=a"(r):"a"(n),"b"(a):"memory");return r;}
 static inline int syscall2(int n,int a,int b){int r;__asm__ volatile("int $0x80":"=a"(r):"a"(n),"b"(a),"c"(b):"memory");return r;}

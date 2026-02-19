@@ -405,6 +405,22 @@ PoOS v1.4 introduces a minimal container substrate with namespace, cgroup, and s
 
 ### Limitations
 
-- Network namespace currently toggles host-net access on/off; virtual interfaces/veth/NAT are not yet implemented.
 - cgroup memory/cpu quota fields are plumbed and observable, with pids controller being the hard-enforced controller in this snapshot.
 - `setns()` and argument-level seccomp filters are reserved for follow-up.
+
+## PoOS v1.5 container networking
+
+PoOS v1.5 extends the v1.4 namespace substrate with an integrated container networking control plane.
+
+- `CLONE_NEWNET` namespaces now bootstrap a virtual topology model: `veth` host/peer names, per-namespace software bridge identity, container-side leased IPv4, and default route metadata (`kernel/ns/netns.*`).
+- Per-netns state now tracks isolated route/ARP tables and L2/L3 counters, plus NAT and port-forward rule tables.
+- `sys_netctl` now exposes namespace diagnostics and control commands:
+  - `10`: fetch per-netns bridge/veth/NAT diagnostics and counters
+  - `11`: add host->container TCP/UDP port-forward mapping (CAP_NET_ADMIN)
+  - `12`: enable/disable per-netns NAT masquerade mode (CAP_NET_ADMIN)
+- Added userland `/bin/netnsctl` for namespace networking operations (`show`, `nat on/off`, `pfwd <host-port> <container-port>`).
+
+### v1.5 notes
+
+- Packet data path remains single-NIC in this snapshot; veth/bridge/NAT are represented in per-namespace control-plane state and hardened syscall plumbing.
+- NAT/port-forward counters are maintained for observability and future packet-path wiring.
