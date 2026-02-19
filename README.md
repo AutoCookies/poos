@@ -298,3 +298,41 @@ qemu-system-i386 -smp 4 \
   -drive format=raw,file=build/poos.img,if=ide,index=0 \
   -drive format=raw,file=build/poos_disk.img,if=ide,index=1
 ```
+
+## PoOS v1.2 security model
+
+PoOS v1.2 adds a credential-based security layer:
+
+- Per-process credentials (`uid/euid/suid`, `gid/egid/sgid`, supplementary groups, umask).
+- Capability bitsets (`permitted/effective/inheritable`) with checks for net raw/admin, chown, DAC override, sysadmin, kill.
+- VFS permission enforcement centralized in `kernel/vfs/vfs_perm.c`.
+- File ownership + mode bits on vnodes (`uid/gid/mode`, including setuid/setgid bits).
+- Secure exec hooks for setuid/setgid transitions and capability trimming.
+- Process-root isolation (`chroot`) via per-process root vnode + chroot-aware path resolve.
+- Audit logging via non-blocking console audit events (`[AUDIT] ...`).
+
+### Credential semantics
+
+- Real/effective/saved IDs are tracked in `struct cred`.
+- `fork()` clones credentials from parent.
+- `exec()` may transition effective IDs when setuid/setgid bits are present on executable and binary is not group/world writable.
+
+### Users/groups/password DB
+
+- `/etc/passwd` and `/etc/group` are parsed by kernel auth layer.
+- `/etc/shadow` is present for password storage format (minimal v1 placeholder hash format).
+- `login` user app uses `sys_auth()` and then switches uid before starting `/bin/sh`.
+
+### Admin/user tools
+
+- `login`, `su`, `id`, `chmod`, `chown`, `umask`, `passwd` included in `/bin`.
+
+### Isolation and audit
+
+- `chroot` syscall requires CAP_SYS_ADMIN.
+- `..` traversal does not escape process root.
+- Security-relevant events are audited: login/chmod/chown/capset/chroot/setuid-exec/permission denies.
+
+### Adding users (v1)
+
+Edit `/etc/passwd`, `/etc/group`, and `/etc/shadow` inside initrd rootfs and rebuild image with `make build`.

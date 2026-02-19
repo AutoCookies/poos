@@ -1,5 +1,6 @@
 #include "path.h"
 #include "mount.h"
+#include "../proc/proc.h"
 
 static int str_eq(const char* a, const char* b) {
     u32 i = 0;
@@ -24,7 +25,8 @@ int path_next_component(const char** path, char* out_name, u32 out_size) {
 
 int vfs_resolve(const char* path, struct vnode** out) {
     if (!path || path[0] != '/') return -1;
-    struct vnode* cur = mount_root();
+    struct vnode* jail = proc_current_root();
+    struct vnode* cur = jail ? jail : mount_root();
     char comp[64];
     char cur_path[128] = "/";
     const char* p = path;
@@ -35,6 +37,7 @@ int vfs_resolve(const char* path, struct vnode** out) {
         rc = path_next_component(&p, comp, sizeof(comp));
         if (rc <= 0) break;
         if (str_eq(comp, ".")) continue;
+        if (str_eq(comp, "..")) continue;
         if (cur_path[1] != '\0') {
             u32 l = 0; while (cur_path[l]) l++;
             cur_path[l++] = '/'; cur_path[l] = '\0';

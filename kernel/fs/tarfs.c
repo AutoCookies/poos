@@ -111,7 +111,7 @@ static int tar_getattr(struct vnode* vn, struct vstat* out) {
     struct tarfs_node* n = (struct tarfs_node*)vn->data;
     const struct tar_header* h = hdr_at(n->mnt, n->hdr_off);
     out->type = n->is_dir ? VNODE_DIR : VNODE_REG;
-    out->mode = oct2u(h->mode, 7);
+    out->mode = oct2u(h->mode, 7); out->uid=vn->uid; out->gid=vn->gid;
     out->size = n->is_dir ? 0 : oct2u(h->size, 11);
     return 0;
 }

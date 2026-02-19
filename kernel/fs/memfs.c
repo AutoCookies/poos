@@ -13,10 +13,10 @@ static u32 str_len(const char* s){u32 i=0;while(s[i])i++;return i;}
 
 static int mf_read(struct vnode* vn,u32 off,void* buf,u32 len){ struct mem_file* f=(struct mem_file*)vn->data; if(off>=f->size) return 0; if(off+len>f->size) len=f->size-off; mem_copy(buf,f->data+off,len); return (int)len; }
 static int mf_write(struct vnode* vn,u32 off,const void* buf,u32 len){ struct mem_file* f=(struct mem_file*)vn->data; if(off>=MEMFS_MAX_SIZE) return 0; if(off+len>MEMFS_MAX_SIZE) len=MEMFS_MAX_SIZE-off; mem_copy(f->data+off,buf,len); if(off+len>f->size) f->size=off+len; return (int)len; }
-static int mf_getattr(struct vnode* vn,struct vstat* out){ struct mem_file* f=(struct mem_file*)vn->data; out->type=vn->type; out->mode=0; out->size=f->size; return 0; }
+static int mf_getattr(struct vnode* vn,struct vstat* out){ struct mem_file* f=(struct mem_file*)vn->data; out->type=vn->type; out->mode=vn->mode; out->uid=vn->uid; out->gid=vn->gid; out->size=f->size; return 0; }
 static int mdir_lookup(struct vnode* dir,const char* name,struct vnode** out){ (void)dir; for(u32 i=0;i<MEMFS_MAX_FILES;i++) if(g_files[i].used&&str_eq(g_files[i].name,name)){ *out=&g_files[i].vn; vnode_ref(*out); return 0; } return -1; }
 static int mdir_readdir(struct vnode* vn,u32* cookie,struct vdirent* out){ (void)vn; u32 seen=0; for(u32 i=0;i<MEMFS_MAX_FILES;i++) if(g_files[i].used){ if(seen++<*cookie) continue; mem_copy(out->name,g_files[i].name,32); out->name[31]=0; out->type=VNODE_REG; *cookie=seen; return 1; } return 0; }
-static int mdir_getattr(struct vnode* vn,struct vstat* out){ (void)vn; out->type=VNODE_DIR; out->mode=0; out->size=0; return 0; }
+static int mdir_getattr(struct vnode* vn,struct vstat* out){ (void)vn; out->type=VNODE_DIR; out->mode=vn->mode; out->uid=vn->uid; out->gid=vn->gid; out->size=0; return 0; }
 
 static const struct vnode_ops g_file_ops={0,mf_read,mf_write,0,mf_getattr};
 static const struct vnode_ops g_dir_ops={mdir_lookup,0,0,mdir_readdir,mdir_getattr};

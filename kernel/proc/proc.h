@@ -18,6 +18,8 @@
 
 struct trapframe;
 struct addrspace;
+struct cred;
+struct vnode;
 
 typedef enum { PROC_RUNNING = 0, PROC_ZOMBIE, PROC_DEAD } proc_state_t;
 
@@ -38,6 +40,8 @@ struct proc {
     const char* image_path;
     struct fdtable fdt;
     struct addrspace* as;
+    struct cred* cred;
+    struct vnode* root_vnode;
     struct proc* next;
 };
 
@@ -55,5 +59,11 @@ int proc_setup_user_stack(struct proc* p, u32* out_esp);
 int proc_fork_from_tf(struct trapframe* tf);
 int proc_send_signal(u32 pid, int sig);
 void proc_child_event(struct proc* parent);
+struct cred* cred_current(void);
+struct vnode* proc_current_root(void);
+int proc_setuid(u32 uid);
+int proc_setgid(u32 gid);
+int proc_capset(u32 pid, u32 caps);
+int proc_chroot(const char* path);
 
 #endif

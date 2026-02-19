@@ -37,6 +37,16 @@ enum {
     SYS_RECVFROM = 31,
     SYS_SOCKCLOSE = 32,
     SYS_NETCTL = 33,
+    SYS_GETUID = 34,
+    SYS_SETUID = 35,
+    SYS_GETEUID = 36,
+    SYS_CHMOD = 37,
+    SYS_CHOWN = 38,
+    SYS_UMASK = 39,
+    SYS_CHROOT = 40,
+    SYS_CAPGET = 41,
+    SYS_CAPSET = 42,
+    SYS_AUTH = 43,
 };
 
 #endif

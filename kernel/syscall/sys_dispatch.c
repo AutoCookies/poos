@@ -36,6 +36,10 @@ int sys_sendto(int fd,const void* buf,u32 len,u32 flags,const void* sa,u32 alen)
 int sys_recvfrom(int fd,void* buf,u32 len,u32 flags,void* sa,u32* alen);
 int sys_sockclose(int fd);
 int sys_netctl(int cmd, void* buf, u32 len);
+int sys_getuid(void); int sys_setuid(int uid); int sys_geteuid(void);
+int sys_chmod(const char* path,u32 mode); int sys_chown(const char* path,u32 uid,u32 gid);
+int sys_umask(u32 mask); int sys_chroot(const char* path); int sys_capget(void); int sys_capset(int pid,u32 caps);
+int sys_auth(const char* user,const char* pass,u32* uid,u32* gid);
 
 void syscall_dispatch(struct trapframe* tf) {
     int ret = -38;
@@ -73,6 +77,16 @@ void syscall_dispatch(struct trapframe* tf) {
         case SYS_RECVFROM: ret = sys_recvfrom((int)tf->ebx,(void*)tf->ecx,tf->edx,tf->esi,(void*)tf->edi,(u32*)tf->ebp); break;
         case SYS_SOCKCLOSE: ret = sys_sockclose((int)tf->ebx); break;
         case SYS_NETCTL: ret = sys_netctl((int)tf->ebx,(void*)tf->ecx,tf->edx); break;
+        case SYS_GETUID: ret = sys_getuid(); break;
+        case SYS_SETUID: ret = sys_setuid((int)tf->ebx); break;
+        case SYS_GETEUID: ret = sys_geteuid(); break;
+        case SYS_CHMOD: ret = sys_chmod((const char*)tf->ebx,tf->ecx); break;
+        case SYS_CHOWN: ret = sys_chown((const char*)tf->ebx,tf->ecx,tf->edx); break;
+        case SYS_UMASK: ret = sys_umask(tf->ebx); break;
+        case SYS_CHROOT: ret = sys_chroot((const char*)tf->ebx); break;
+        case SYS_CAPGET: ret = sys_capget(); break;
+        case SYS_CAPSET: ret = sys_capset((int)tf->ebx,tf->ecx); break;
+        case SYS_AUTH: ret = sys_auth((const char*)tf->ebx,(const char*)tf->ecx,(u32*)tf->edx,(u32*)tf->esi); break;
         default: break;
     }
     tf->eax = (u32)ret;

@@ -178,3 +178,48 @@ sys_netctl: mov eax,33
             mov edx,[esp+12]
             int 0x80
             ret
+global sys_getuid, sys_geteuid, sys_setuid, sys_chmod, sys_chown, sys_umask, sys_chroot, sys_capget, sys_capset, sys_auth
+sys_getuid: mov eax,34
+            int 0x80
+            ret
+sys_setuid: mov eax,35
+            mov ebx,[esp+4]
+            int 0x80
+            ret
+sys_geteuid: mov eax,36
+             int 0x80
+             ret
+sys_chmod: mov eax,37
+           mov ebx,[esp+4]
+           mov ecx,[esp+8]
+           int 0x80
+           ret
+sys_chown: mov eax,38
+           mov ebx,[esp+4]
+           mov ecx,[esp+8]
+           mov edx,[esp+12]
+           int 0x80
+           ret
+sys_umask: mov eax,39
+           mov ebx,[esp+4]
+           int 0x80
+           ret
+sys_chroot: mov eax,40
+            mov ebx,[esp+4]
+            int 0x80
+            ret
+sys_capget: mov eax,41
+            int 0x80
+            ret
+sys_capset: mov eax,42
+            mov ebx,[esp+4]
+            mov ecx,[esp+8]
+            int 0x80
+            ret
+sys_auth: mov eax,43
+          mov ebx,[esp+4]
+          mov ecx,[esp+8]
+          mov edx,[esp+12]
+          mov esi,[esp+16]
+          int 0x80
+          ret
