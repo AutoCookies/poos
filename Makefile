@@ -19,7 +19,7 @@ INITRD_TAR := $(BUILD_DIR)/initrd.tar
 
 INITRD_LBA := 300
 
-USER_APPS := init sh ls cat hello sleep fault cowtest mmaptest filemaptest mkdir rm mv cp sync ifconfig ping udpsend udprecv dnslookup httpget tcptest
+USER_APPS := init sh ls cat hello sleep fault cowtest mmaptest filemaptest mkdir rm mv cp sync ifconfig ping udpsend udprecv dnslookup httpget tcptest schedtest iotest nettest mmtest cpustat ps iostat locks
 USER_ELFS := $(patsubst %,$(BUILD_DIR)/user/%.elf,$(USER_APPS))
 USER_COMMON_OBJS := $(BUILD_DIR)/user/crt0.o $(BUILD_DIR)/user/libc_min/syscall.o $(BUILD_DIR)/user/libc_min/printf_min.o $(BUILD_DIR)/user/libc_min/string.o
 
@@ -35,6 +35,10 @@ KERNEL_C_SRCS := \
 	kernel/fs/initrd.c kernel/fs/tarfs.c kernel/fs/devfs.c kernel/fs/memfs.c \
 	kernel/blk/blkdev.c kernel/blk/bio.c kernel/blk/part.c kernel/blk/blk_debug.c \
 	kernel/drivers/ata_pio.c kernel/drivers/virtio_blk.c \
+	kernel/arch/x86/smp/smp.c kernel/arch/x86/smp/apic.c kernel/arch/x86/smp/lapic.c kernel/arch/x86/smp/ioapic.c kernel/arch/x86/smp/ipi.c kernel/arch/x86/smp/cpu.c kernel/arch/x86/smp/per_cpu.c kernel/arch/x86/smp/gdt_percpu.c kernel/arch/x86/smp/tss_percpu.c kernel/arch/x86/smp/traps_percpu.c kernel/arch/x86/smp/mp_table.c kernel/arch/x86/smp/acpi_madt.c \
+	kernel/sched/smp/sched_smp.c kernel/sched/smp/runqueue_percpu.c kernel/sched/smp/load_balance.c kernel/sched/smp/preempt.c \
+	kernel/locks/spinlock.c kernel/locks/rwlock.c kernel/locks/mutex.c kernel/locks/lock_debug.c \
+	kernel/time/clocksource.c kernel/time/timerwheel.c kernel/time/time_smp.c kernel/irq/irq.c kernel/irq/irq_affinity.c kernel/irq/softirq.c \
 	kernel/bcache/bcache.c kernel/bcache/lru.c kernel/bcache/writeback.c kernel/bcache/bcache_debug.c \
 	kernel/fs/fat/fat.c kernel/fs/fat/fat_dir.c kernel/fs/fat/fat_file.c kernel/fs/fat/fat_alloc.c kernel/fs/fat/fat_debug.c \
 	kernel/ipc/ringbuf.c kernel/ipc/pipe.c kernel/tty/tty.c kernel/tty/kbd.c kernel/tty/console.c \
@@ -42,7 +46,7 @@ KERNEL_C_SRCS := \
 	kernel/mm/addrspace.c kernel/mm/vma.c kernel/mm/page.c kernel/mm/cow.c kernel/mm/mmap.c kernel/mm/faults_vm.c kernel/mm/pagecache.c kernel/mm/anon.c kernel/mm/filemap.c kernel/mm/tlb.c kernel/mm/mm_debug.c \
 	kernel/pci/pci.c kernel/net/net.c kernel/net/net_timer.c kernel/net/net_stats.c kernel/net/netif.c kernel/net/pbuf.c kernel/net/checksum.c kernel/net/eth.c kernel/net/arp.c kernel/net/ipv4.c kernel/net/icmp.c kernel/net/udp.c kernel/net/dhcp.c kernel/net/dns.c kernel/net/route.c kernel/net/sock.c kernel/net/sock_api.c kernel/net/net_debug.c kernel/net/tcp/tcp.c kernel/net/tcp/tcp_state.c kernel/net/tcp/tcp_input.c kernel/net/tcp/tcp_output.c kernel/net/tcp/tcp_timer.c kernel/net/tcp/tcp_retransmit.c kernel/net/tcp/tcp_window.c kernel/net/tcp/tcp_conn.c kernel/net/tcp/tcp_sock.c kernel/net/tcp/tcp_debug.c kernel/drivers/rtl8139.c kernel/drivers/virtio_net.c kernel/dev/devnet.c
 
-KERNEL_ASM_SRCS := kernel/entry.asm kernel/arch/x86/isr_stubs.asm kernel/arch/x86/ring3.asm kernel/arch/x86/syscall_stub.asm kernel/sched/context_switch.asm
+KERNEL_ASM_SRCS := kernel/entry.asm kernel/arch/x86/isr_stubs.asm kernel/arch/x86/ring3.asm kernel/arch/x86/syscall_stub.asm kernel/sched/context_switch.asm kernel/arch/x86/smp/start_ap.asm
 
 KERNEL_OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(KERNEL_C_SRCS)) $(patsubst %.asm,$(BUILD_DIR)/%.o,$(KERNEL_ASM_SRCS))
 
@@ -80,6 +84,14 @@ $(INITRD_TAR): $(USER_ELFS) user/pack/mkinitrd.sh
 	cp $(BUILD_DIR)/user/dnslookup.elf user/pack/rootfs/bin/dnslookup
 	cp $(BUILD_DIR)/user/httpget.elf user/pack/rootfs/bin/httpget
 	cp $(BUILD_DIR)/user/tcptest.elf user/pack/rootfs/bin/tcptest
+	cp $(BUILD_DIR)/user/schedtest.elf user/pack/rootfs/bin/schedtest
+	cp $(BUILD_DIR)/user/iotest.elf user/pack/rootfs/bin/iotest
+	cp $(BUILD_DIR)/user/nettest.elf user/pack/rootfs/bin/nettest
+	cp $(BUILD_DIR)/user/mmtest.elf user/pack/rootfs/bin/mmtest
+	cp $(BUILD_DIR)/user/cpustat.elf user/pack/rootfs/bin/cpustat
+	cp $(BUILD_DIR)/user/ps.elf user/pack/rootfs/bin/ps
+	cp $(BUILD_DIR)/user/iostat.elf user/pack/rootfs/bin/iostat
+	cp $(BUILD_DIR)/user/locks.elf user/pack/rootfs/bin/locks
 	user/pack/mkinitrd.sh user/pack/rootfs $(INITRD_TAR)
 
 $(BOOT_BIN): boot/boot.asm boot/gdt.asm

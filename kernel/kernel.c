@@ -7,6 +7,7 @@
 #include "mem/heap.h"
 #include "arch/x86/cpu.h"
 #include "arch/x86/irq.h"
+#include "arch/x86/smp/smp.h"
 #include "arch/x86/gdt.h"
 #include "sched/sched.h"
 #include "time/time.h"
@@ -49,7 +50,7 @@ void kernel_main(struct BootInfo* bootinfo) {
     irq_disable();
 
     vga_init();
-    vga_write("PoOS v0.9 booting...\n");
+    vga_write("PoOS v1.1 booting...\n");
 
     gdt_init();
     irq_init();
@@ -70,6 +71,8 @@ void kernel_main(struct BootInfo* bootinfo) {
     proc_init();
     syscall_init();
     pit_init();
+    smp_init();
+    smp_boot_aps();
 
     vfs_init();
     bcache_init();
