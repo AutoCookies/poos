@@ -3,6 +3,8 @@
 
 #include "../types.h"
 
+struct trapframe;
+
 struct vm_counters {
     u32 faults_total;
     u32 faults_handled;

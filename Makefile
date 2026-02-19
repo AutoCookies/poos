@@ -23,6 +23,13 @@ LDFLAGS := -T linker.ld -nostdlib -m elf_i386
 U_CFLAGS := -std=c11 -ffreestanding -fno-pic -fno-stack-protector -fno-builtin -m32 -O2 -Wall -Wextra -Werror
 
 PROFILE ?= edge80
+
+# Host GCC is stricter about one-line formatting in legacy sources.
+# Keep -Werror, but suppress this style-only warning for host fallback builds.
+ifeq ($(TOOLCHAIN_DESC),host (gcc/binutils fallback))
+CFLAGS += -Wno-misleading-indentation -Wno-missing-field-initializers
+U_CFLAGS += -Wno-misleading-indentation -Wno-missing-field-initializers
+endif
 ifeq ($(PROFILE),edge80)
 CFLAGS += -DCONFIG_EDGE_80MB=1 -DCONFIG_LEAN_SERVER=1
 U_CFLAGS += -DCONFIG_EDGE_80MB=1 -DCONFIG_LEAN_SERVER=1
