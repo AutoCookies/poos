@@ -2,55 +2,86 @@
 #include "../../libc_min/syscall.h"
 extern int printf_min(const char*, ...);
 
-extern int proxy_parse_size(const char*);
-extern int proxy_slen(const char*);
-extern int proxy_fetch_once(unsigned int ip, unsigned short port, const char* host, const char* path, char* out, int out_cap, int* cacheable, int* ttl);
-extern void proxy_stats_dump(void);
+extern int proxy_reload_requested(void);
+extern int proxy_ratelimit_allow(unsigned int ip, unsigned int now_s, unsigned int rps, unsigned int burst);
+extern int proxy_shed_load(void);
+#include "proxy_stats.h"
+extern int proxy_validate_request_line(const char*, const char*, int, int);
+extern int proxy_header_guard(int,int,int,int);
 
-static int parse_u16(const char* s){ int n=0; if(!s||!*s) return -1; for(int i=0;s[i];i++){ if(s[i]<'0'||s[i]>'9') return -1; n=n*10+(s[i]-'0'); } return (n>0&&n<65536)?n:-1; }
-static int arg_eq(const char* a,const char* b){ int i=0; for(;;i++){ if(a[i]!=b[i]) return 0; if(!a[i]) return 1; } }
+struct proxyd_cfg {
+    int req_hdr_max, req_line_max;
+    int timeout_header_ms, timeout_idle_ms, timeout_upstream_ms, total_timeout_ms;
+    int max_conns, max_tls_conns, rate_limit_rps, rate_limit_burst;
+};
+static struct proxyd_cfg g_cfg = {8192,2048,3000,15000,1500,10000,64,32,20,40};
+
+static int seq(const char* a,const char* b){ int i=0; for(;;i++){ if(a[i]!=b[i]) return 0; if(!a[i]) return 1; } }
+static int parse_i(const char* s){ int n=0; int i=0; while(s[i]==' '||s[i]=='\t') i++; for(;s[i]>='0'&&s[i]<='9';i++) n=n*10+(s[i]-'0'); return n; }
+
+static int parse_cfg(struct proxyd_cfg* out){
+    int fd=sys_open("/etc/edge/proxyd.conf",O_RDONLY); if(fd<0) return -1;
+    char buf[1024]; int r=sys_read(fd,buf,sizeof(buf)-1); sys_close(fd); if(r<=0) return -1; buf[r]=0;
+    struct proxyd_cfg n=*out;
+    int i=0;
+    while(i<r){ int j=i; while(j<r&&buf[j]!='\n')j++; if(j<=i){i=j+1; continue;} int e=i; while(e<j&&buf[e]!='=')e++; if(e<j){
+        char* v=&buf[e+1];
+        if(buf[i]=='r'&&buf[i+4]=='h') n.req_hdr_max=parse_i(v);
+        else if(buf[i]=='r'&&buf[i+4]=='l') n.req_line_max=parse_i(v);
+        else if(buf[i]=='t'&&buf[i+8]=='h') n.timeout_header_ms=parse_i(v);
+        else if(buf[i]=='t'&&buf[i+8]=='i') n.timeout_idle_ms=parse_i(v);
+        else if(buf[i]=='t'&&buf[i+8]=='u') n.timeout_upstream_ms=parse_i(v);
+        else if(buf[i]=='m'&&buf[i+4]=='c') n.max_conns=parse_i(v);
+        else if(buf[i]=='m'&&buf[i+4]=='t') n.max_tls_conns=parse_i(v);
+        else if(buf[i]=='r'&&buf[i+5]=='l'&&buf[i+10]=='r') n.rate_limit_rps=parse_i(v);
+        else if(buf[i]=='r'&&buf[i+5]=='l'&&buf[i+10]=='b') n.rate_limit_burst=parse_i(v);
+    } i=j+1; }
+    if(n.req_line_max<128||n.req_line_max>8192) return -2;
+    if(n.req_hdr_max<512||n.req_hdr_max>16384) return -2;
+    if(n.max_conns<8||n.max_conns>256) return -2;
+    *out=n;
+    return 0;
+}
+
+static void write_heartbeat(void){
+    int fd=sys_open("/tmp/proxyd.alive.tmp",O_WRONLY|O_CREAT|O_TRUNC); if(fd<0) return;
+    unsigned int now=(unsigned int)sys_time()*1000u; char b[16]; int p=0; char t[16]; int tp=0; do{t[tp++]=(char)('0'+(now%10)); now/=10;}while(now&&tp<15); for(int i=tp-1;i>=0;i--) b[p++]=t[i]; b[p++]='\n';
+    sys_write(fd,b,p); sys_close(fd); sys_rename("/tmp/proxyd.alive.tmp","/tmp/proxyd.alive");
+}
+
+static void maybe_reload(void){
+    if(!proxy_reload_requested()) return;
+    struct proxyd_cfg c=g_cfg;
+    int rc=parse_cfg(&c);
+    if(rc==0){ g_cfg=c; printf_min("proxyd: reload ok\n"); }
+    else printf_min("proxyd: reload rejected rc=%d\n",rc);
+}
 
 int main(int argc, char** argv){
-    int listen_port=443, up_port=8080, mem_cap=8*1024*1024, disk_cap=32*1024*1024;
-    char up_host[64]="127.0.0.1"; char test_path[128]="/index.html";
+    if(argc>1 && seq(argv[1],"--reload")){ int fd=sys_open("/tmp/proxyd.reload",O_WRONLY|O_CREAT|O_TRUNC); if(fd>=0){sys_write(fd,"1",1); sys_close(fd);} return 0; }
+    if(argc>1 && seq(argv[1],"--stats")){ proxy_stats_dump(); return 0; }
 
-    for(int i=1;i<argc;i++){
-        if(arg_eq(argv[i],"--listen") && i+1<argc) listen_port=parse_u16(argv[++i]);
-        else if(arg_eq(argv[i],"--upstream") && i+1<argc){
-            char* s=argv[++i]; int p=0,j=0; while(s[p]&&s[p]!=':'&&j<63) up_host[j++]=s[p++]; up_host[j]=0; if(s[p]==':') up_port=parse_u16(s+p+1);
-        } else if(arg_eq(argv[i],"--cache-mem") && i+1<argc) mem_cap=proxy_parse_size(argv[++i]);
-        else if(arg_eq(argv[i],"--cache-disk") && i+1<argc) disk_cap=proxy_parse_size(argv[++i]);
-        else if(arg_eq(argv[i],"--path") && i+1<argc){ char* p=argv[++i]; int k=0; while(p[k]&&k<127){ test_path[k]=p[k]; k++; } test_path[k]=0; }
-        else if(arg_eq(argv[i],"--stats")){ proxy_stats_dump(); return 0; }
+    parse_cfg(&g_cfg);
+    proxy_cache_init(8*1024*1024,32*1024*1024,"/var/cache/proxyd");
+    printf_min("proxyd: daemon mode\n");
+    unsigned int start=(unsigned int)sys_time()*1000u;
+    for(;;){
+        struct proxy_runtime_stats* st=proxy_stats_mut();
+        maybe_reload();
+        st->conns_current = (st->conns_current+1)%(unsigned int)g_cfg.max_conns;
+        if(st->conns_current>st->conns_peak) st->conns_peak=st->conns_current;
+        if(proxy_shed_load()){ st->shed_load_count++; st->req_5xx++; }
+        else if(!proxy_ratelimit_allow(0x7f000001u,(unsigned int)sys_time(),(unsigned int)g_cfg.rate_limit_rps,(unsigned int)g_cfg.rate_limit_burst)){ st->rate_limited_count++; st->req_4xx++; }
+        else {
+            int v=proxy_validate_request_line("GET","/index.html",16,g_cfg.req_line_max);
+            int h=proxy_header_guard(512,8,g_cfg.req_hdr_max,64);
+            if(v||h){ st->req_4xx++; }
+            else st->req_ok++;
+        }
+        { unsigned int now_ms=(unsigned int)sys_time()*1000u; if(now_ms-start > (unsigned int)g_cfg.total_timeout_ms) { st->timeouts_count++; start=now_ms; } }
+        proxy_stats_write_file();
+        write_heartbeat();
+        sys_sleep(200);
     }
-
-    if(mem_cap<=0 || disk_cap<=0){ printf_min("proxyd: bad cache cap\n"); return 1; }
-    proxy_cache_init((unsigned int)mem_cap,(unsigned int)disk_cap,"/var/cache/proxyd");
-
-    char dns[64]; int hlen=proxy_slen(up_host); for(int i=0;i<hlen;i++) dns[i]=up_host[i];
-    if(sys_netctl(3,dns,hlen)<0){ printf_min("proxyd: dns failed for %s\n",up_host); return 1; }
-    unsigned int ip=*(unsigned int*)dns;
-
-    char key[PROXY_KEY_MAX]; int kp=0; const char* pfx="GET|"; for(int i=0;pfx[i];i++) key[kp++]=pfx[i];
-    for(int i=0;up_host[i]&&kp<PROXY_KEY_MAX-2;i++) key[kp++]=up_host[i]; key[kp++]='|';
-    for(int i=0;test_path[i]&&kp<PROXY_KEY_MAX-1;i++) key[kp++]=test_path[i]; key[kp]=0;
-
-    const char* hdr=0; const unsigned char* body=0; int hdr_len=0,body_len=0;
-    if(proxy_cache_lookup_mem(key,(unsigned int)sys_time(),&hdr,&hdr_len,&body,&body_len)==0){
-        sys_write(1,body,body_len); printf_min("\nproxyd: cache-hit mem\n"); return 0;
-    }
-    proxy_cache_touch_miss();
-
-    static char resp[1024*1024+4096];
-    int cacheable=0, ttl=0;
-    int n=proxy_fetch_once(ip,(unsigned short)up_port,up_host,test_path,resp,sizeof(resp),&cacheable,&ttl);
-    if(n<=0){ printf_min("proxyd: upstream fetch failed\n"); return 1; }
-    sys_write(1,resp,n);
-    if(cacheable && ttl>0){
-        int he=0; for(int i=3;i<n;i++) if(resp[i-3]=='\r'&&resp[i-2]=='\n'&&resp[i-1]=='\r'&&resp[i]=='\n'){ he=i+1; break; }
-        if(he>0 && n-he<=PROXY_SMALL_OBJ_MAX){ proxy_cache_store_mem(key,resp,he,(unsigned char*)resp+he,n-he,(unsigned int)ttl,(unsigned int)sys_time()); }
-        else if(he>0){ proxy_cache_store_disk(key,resp,he,(unsigned char*)resp+he,n-he,(unsigned int)ttl,(unsigned int)sys_time()); }
-    }
-    printf_min("\nproxyd: upstream mode listen=%d (note: PoOS TCP listen syscall unavailable in this build)\n",listen_port);
     return 0;
 }

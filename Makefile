@@ -32,11 +32,13 @@ INITRD_TAR := $(BUILD_DIR)/initrd.tar
 
 INITRD_LBA := 300
 
-USER_APPS := init sh ls cat hello sleep fault cowtest mmaptest filemaptest mkdir rm mv cp sync ifconfig ping udpsend udprecv dnslookup httpget httpsget tlsprobe tcptest schedtest iotest nettest mmtest cpustat ps iostat locks login su id chmod chown umask passwd poosrun netnsctl memstat proxyd
+USER_APPS := init sh ls cat hello sleep fault cowtest mmaptest filemaptest mkdir rm mv cp sync ifconfig ping udpsend udprecv dnslookup httpget httpsget tlsprobe tcptest schedtest iotest nettest mmtest cpustat ps iostat locks login su id chmod chown umask passwd poosrun netnsctl memstat proxyd edge proxystat healthcheck
 USER_ELFS := $(patsubst %,$(BUILD_DIR)/user/%.elf,$(USER_APPS))
 USER_COMMON_OBJS := $(BUILD_DIR)/user/crt0.o $(BUILD_DIR)/user/libc_min/syscall.o $(BUILD_DIR)/user/libc_min/printf_min.o $(BUILD_DIR)/user/libc_min/string.o
-PROXYD_SRCS := proxyd proxy_conn proxy_http1 proxy_tls proxy_cache_mem proxy_cache_disk proxy_eviction proxy_limits proxy_stats proxy_log
+PROXYD_SRCS := proxyd proxy_conn proxy_http1 proxy_tls proxy_cache_mem proxy_cache_disk proxy_eviction proxy_limits proxy_timeouts proxy_ratelimit proxy_health proxy_reload proxy_stats proxy_log
 PROXYD_OBJS := $(patsubst %,$(BUILD_DIR)/user/apps/proxyd/%.o,$(PROXYD_SRCS))
+EDGE_SRCS := init_edge svc_supervisor svc_config svc_health edge_bench edge_report edge_limits edge_time edge_health
+EDGE_OBJS := $(patsubst %,$(BUILD_DIR)/user/apps/edge/%.o,$(EDGE_SRCS))
 
 KERNEL_C_SRCS := \
 	kernel/kernel.c kernel/gdt.c kernel/arch/x86/gdt.c kernel/arch/x86/tss.c kernel/arch/x86/idt.c \
@@ -132,6 +134,9 @@ $(INITRD_TAR): $(USER_ELFS) user/pack/mkinitrd.sh
 	cp $(BUILD_DIR)/user/poosrun.elf user/pack/rootfs/bin/poosrun
 	cp $(BUILD_DIR)/user/netnsctl.elf user/pack/rootfs/bin/netnsctl
 	cp $(BUILD_DIR)/user/proxyd.elf user/pack/rootfs/bin/proxyd
+	cp $(BUILD_DIR)/user/edge.elf user/pack/rootfs/bin/edge
+	cp $(BUILD_DIR)/user/proxystat.elf user/pack/rootfs/bin/proxystat
+	cp $(BUILD_DIR)/user/healthcheck.elf user/pack/rootfs/bin/healthcheck
 	user/pack/mkinitrd.sh user/pack/rootfs $(INITRD_TAR)
 
 $(BOOT_BIN): boot/boot.asm boot/gdt.asm
@@ -187,3 +192,10 @@ clean:
 $(DATA_IMAGE): tools/mkfatdisk.py
 	mkdir -p $(BUILD_DIR)
 	python3 tools/mkfatdisk.py $(DATA_IMAGE)
+
+$(BUILD_DIR)/user/apps/edge/%.o: user/apps/edge/%.c
+	mkdir -p $(dir $@)
+	$(CC) $(U_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/user/edge.elf: $(USER_COMMON_OBJS) $(EDGE_OBJS) user/user.ld
+	$(LD) -T user/user.ld -nostdlib -m elf_i386 -o $@ $(USER_COMMON_OBJS) $(EDGE_OBJS)
