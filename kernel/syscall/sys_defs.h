@@ -22,6 +22,8 @@ enum {
     SYS_PIPE = 16,
     SYS_DUP2 = 17,
     SYS_KILL = 18,
+    SYS_MMAP = 19,
+    SYS_MUNMAP = 20,
 };
 
 #endif

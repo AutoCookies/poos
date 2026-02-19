@@ -10,6 +10,10 @@
 #include "../sched/sched.h"
 #include "../sched/thread.h"
 #include "../vfs/vfs.h"
+#include "../mm/addrspace.h"
+#include "../mm/vma.h"
+#include "../mm/cow.h"
+#include "../mm/page.h"
 
 u32 pid_alloc(void);
 int proc_setup_user_stack(struct proc* p, u32* out_esp);
@@ -58,6 +62,9 @@ struct proc* proc_create(const char* name, struct proc* parent) {
     p->ppid = parent ? parent->pid : 0;
     p->cr3 = alloc_pagedir();
     p->user_stack_top = USER_STACK_TOP;
+    p->as = (struct addrspace*)kmalloc(sizeof(struct addrspace), 8);
+    if (!p->as) return 0;
+    addrspace_init(p->as, p->cr3);
     fdtable_init(&p->fdt);
     proc_setup_stdio(p);
     p->next = g_procs; g_procs = p;
@@ -102,33 +109,14 @@ int proc_spawn_path(const char* path, int* out_pid) {
     return 0;
 }
 
-static int clone_address_space(struct proc* child, struct proc* parent) {
-    u32 old = cpu_read_cr3();
-    for (u32 va = USER_BASE; va < KERNEL_BASE; va += 4096U) {
-        cpu_write_cr3(parent->cr3);
-        u32 phys = 0;
-        if (!vmm_translate(va, &phys) || !vmm_user_accessible(va)) continue;
-        u32 newp = pmm_alloc_frame();
-        if (!newp) { cpu_write_cr3(old); return -1; }
-        cpu_write_cr3(old);
-        if (!vmm_map_page(0xB0000000U, newp, PAGE_RW)) { cpu_write_cr3(old); return -1; }
-        cpu_write_cr3(parent->cr3);
-        mem_copy((void*)0xB0000000U, (void*)va, 4096);
-        cpu_write_cr3(old);
-        vmm_unmap_page(0xB0000000U);
-        if (!vmm_map_page_in(child->cr3, va, newp, PAGE_RW | PAGE_USER)) { cpu_write_cr3(old); return -1; }
-    }
-    cpu_write_cr3(old);
-    return 0;
-}
-
 int proc_fork_from_tf(struct trapframe* tf) {
     struct task* tk = task_current(); struct proc* parent = tk ? tk->owner : 0;
     if (!parent) return -1;
     struct proc* child = proc_create(parent->name, parent); if (!child) return -1;
     fdtable_clone(&child->fdt, &parent->fdt);
     child->image_path = parent->image_path;
-    if (clone_address_space(child, parent) < 0) return -1;
+    if (parent->as) { child->as->vmas = vma_clone_list(parent->as->vmas); if (!child->as->vmas && parent->as->vmas) return -1; }
+    if (cow_fork_clone(child, parent) < 0) return -1;
     struct thread* t = kthread_create(child->name, user_start_fork, 0, 0); if (!t) return -1;
     task_bind_user_thread(t, child, tf->eip, tf->useresp);
     t->arg = t->task_ctx;

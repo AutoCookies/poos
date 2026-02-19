@@ -17,6 +17,7 @@
 #define PROC_SIG_SEGV (1U << 2)
 
 struct trapframe;
+struct addrspace;
 
 typedef enum { PROC_RUNNING = 0, PROC_ZOMBIE, PROC_DEAD } proc_state_t;
 
@@ -36,6 +37,7 @@ struct proc {
     u32 ppid;
     const char* image_path;
     struct fdtable fdt;
+    struct addrspace* as;
     struct proc* next;
 };
 

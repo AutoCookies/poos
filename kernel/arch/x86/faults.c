@@ -2,6 +2,7 @@
 #include "cpu.h"
 #include "../../proc/task.h"
 #include "../../proc/proc.h"
+#include "../../mm/mm.h"
 
 void panic(const char* msg);
 void vga_write(const char* s);
@@ -17,8 +18,11 @@ void faults_handle_page_fault(struct trapframe* tf) {
     vga_write(" eip="); vga_write_hex(tf->eip);
     if (user) {
         struct task* t = task_current();
+        if (mm_handle_page_fault(tf, fault_addr) == 0) return;
+        mm_counters()->faults_sigsegv++;
         vga_write(" pid="); vga_write_u32(t && t->owner ? t->owner->pid : 0U);
         vga_write(" [user]\n");
+        mm_log_vmstat();
         proc_send_signal(t && t->owner ? t->owner->pid : 0U, SIGSEGV);
         proc_kill_current(-11);
         return;

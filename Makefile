@@ -18,7 +18,7 @@ INITRD_TAR := $(BUILD_DIR)/initrd.tar
 
 INITRD_LBA := 300
 
-USER_APPS := init sh ls cat hello sleep fault
+USER_APPS := init sh ls cat hello sleep fault cowtest mmaptest filemaptest
 USER_ELFS := $(patsubst %,$(BUILD_DIR)/user/%.elf,$(USER_APPS))
 USER_COMMON_OBJS := $(BUILD_DIR)/user/crt0.o $(BUILD_DIR)/user/libc_min/syscall.o $(BUILD_DIR)/user/libc_min/printf_min.o $(BUILD_DIR)/user/libc_min/string.o
 
@@ -33,7 +33,8 @@ KERNEL_C_SRCS := \
 	kernel/vfs/vnode.c kernel/vfs/vfs.c kernel/vfs/path.c kernel/vfs/file.c kernel/vfs/fdtable.c kernel/vfs/mount.c kernel/vfs/vfs_debug.c \
 	kernel/fs/initrd.c kernel/fs/tarfs.c kernel/fs/devfs.c kernel/fs/memfs.c \
 	kernel/ipc/ringbuf.c kernel/ipc/pipe.c kernel/tty/tty.c kernel/tty/kbd.c kernel/tty/console.c \
-	kernel/proc/signal.c kernel/proc/proc_table.c kernel/proc/fork.c kernel/proc/thread_user.c kernel/proc/mm_clone.c
+	kernel/proc/signal.c kernel/proc/proc_table.c kernel/proc/fork.c kernel/proc/thread_user.c kernel/proc/mm_clone.c \
+	kernel/mm/addrspace.c kernel/mm/vma.c kernel/mm/page.c kernel/mm/cow.c kernel/mm/mmap.c kernel/mm/faults_vm.c kernel/mm/pagecache.c kernel/mm/anon.c kernel/mm/filemap.c kernel/mm/tlb.c kernel/mm/mm_debug.c
 
 KERNEL_ASM_SRCS := kernel/entry.asm kernel/arch/x86/isr_stubs.asm kernel/arch/x86/ring3.asm kernel/arch/x86/syscall_stub.asm kernel/sched/context_switch.asm
 
@@ -58,6 +59,9 @@ $(INITRD_TAR): $(USER_ELFS) user/pack/mkinitrd.sh
 	cp $(BUILD_DIR)/user/hello.elf user/pack/rootfs/bin/hello
 	cp $(BUILD_DIR)/user/sleep.elf user/pack/rootfs/bin/sleep
 	cp $(BUILD_DIR)/user/fault.elf user/pack/rootfs/bin/fault
+	cp $(BUILD_DIR)/user/cowtest.elf user/pack/rootfs/bin/cowtest
+	cp $(BUILD_DIR)/user/mmaptest.elf user/pack/rootfs/bin/mmaptest
+	cp $(BUILD_DIR)/user/filemaptest.elf user/pack/rootfs/bin/filemaptest
 	user/pack/mkinitrd.sh user/pack/rootfs $(INITRD_TAR)
 
 $(BOOT_BIN): boot/boot.asm boot/gdt.asm
