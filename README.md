@@ -27,6 +27,8 @@ make run
 make run-headless
 ```
 
+`run-headless` is expected to keep the terminal attached and print debug output; it does **not** open a QEMU window.
+
 Equivalent manual command:
 
 ```sh

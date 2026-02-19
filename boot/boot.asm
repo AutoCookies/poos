@@ -129,23 +129,24 @@ ata_lba_read:
     mov al, 1
     out dx, al
 
-    mov edx, eax
+    mov ebx, eax
     mov dx, 0x1F3
-    mov al, dl
+    mov al, bl
     out dx, al
 
     mov dx, 0x1F4
-    mov al, dh
+    mov al, bh
     out dx, al
 
-    shr edx, 16
+    shr ebx, 16
     mov dx, 0x1F5
-    mov al, dl
+    mov al, bl
     out dx, al
 
     mov dx, 0x1F6
     mov al, 0xE0
-    or al, dh
+    and bh, 0x0F
+    or al, bh
     out dx, al
 
     mov dx, 0x1F7
