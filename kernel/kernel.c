@@ -37,6 +37,47 @@ void vga_write_u32(u32 value);
 extern u32 __kernel_phys_start;
 extern u32 __kernel_phys_end;
 
+static void panic_boot(const char* msg) {
+    vga_write("panic: ");
+    vga_write(msg);
+    vga_write("\n");
+    for (;;) cpu_hlt();
+}
+
+static int require_path(const char* path) {
+    struct file* f = 0;
+    if (vfs_open(path, 0, &f) < 0) {
+        vga_write("boot-check: missing ");
+        vga_write(path);
+        vga_write("\n");
+        return -1;
+    }
+    file_put(f);
+    vga_write("boot-check: found ");
+    vga_write(path);
+    vga_write("\n");
+    return 0;
+}
+
+static int launch_init_chain(void) {
+    const char* candidates[] = { "/sbin/init", "/bin/init", "/bin/sh" };
+    for (u32 i = 0; i < (sizeof(candidates) / sizeof(candidates[0])); ++i) {
+        vga_write("launching init candidate: path=");
+        vga_write(candidates[i]);
+        vga_write("\n");
+        if (proc_spawn_path(candidates[i], 0) == 0) {
+            vga_write("launch init success: path=");
+            vga_write(candidates[i]);
+            vga_write("\n");
+            return 0;
+        }
+        vga_write("launch init failed: path=");
+        vga_write(candidates[i]);
+        vga_write("\n");
+    }
+    return -1;
+}
+
 static void ticker(void* arg) {
     (void)arg;
     for (;;) {
@@ -79,23 +120,31 @@ void kernel_main(struct BootInfo* bootinfo) {
     smp_init();
     smp_boot_aps();
 
+    vga_write("mount: preparing root from initrd\n");
     vfs_init();
     bcache_init();
     initrd_set_region(bootinfo->initrd_phys_start, bootinfo->initrd_size);
 
     struct vnode* root = 0;
     if (tarfs_mount_root(initrd_data(), initrd_size(), &root) < 0 || vfs_mount("/", root) < 0) {
-        vga_write("panic: failed to mount initrd root\n");
-        for (;;) cpu_hlt();
+        panic_boot("failed to mount initrd root");
     }
+    vga_write("mount: rootfs mounted at /\n");
+
     if (vfs_mount("/dev", devfs_root()) < 0) {
-        vga_write("panic: failed to mount /dev\n");
-        for (;;) cpu_hlt();
+        panic_boot("failed to mount /dev");
     }
+    vga_write("mount: devfs mounted at /dev\n");
+
     if (vfs_mount("/tmp", memfs_root()) < 0) {
-        vga_write("panic: failed to mount /tmp\n");
-        for (;;) cpu_hlt();
+        panic_boot("failed to mount /tmp");
     }
+    vga_write("mount: memfs mounted at /tmp\n");
+
+    if (require_path("/etc/passwd") < 0 || require_path("/bin/sh") < 0) {
+        panic_boot("runtime sanity checks failed");
+    }
+
     if (ata_pio_init() == 0) {
         struct blkdev* hd0 = blkdev_get("hd0");
         if (hd0 && part_scan_mbr(hd0) == 0) {
@@ -112,8 +161,6 @@ void kernel_main(struct BootInfo* bootinfo) {
     } else {
         vga_write("disk: ata not found\n");
     }
-
-    vga_write("mounted / from initrd (tarfs)\n");
 
     struct file* motd = 0;
     if (vfs_open("/etc/motd", 0, &motd) == 0) {
@@ -132,11 +179,8 @@ void kernel_main(struct BootInfo* bootinfo) {
         vga_write("net: no rtl8139\n");
     }
 
-
-    vga_write("launching /sbin/init\n");
-    if (proc_spawn_path("/sbin/init", 0) < 0) {
-        vga_write("panic: /sbin/init missing\n");
-        for (;;) cpu_hlt();
+    if (launch_init_chain() < 0) {
+        panic_boot("no usable init binary (/sbin/init, /bin/init, /bin/sh)");
     }
 
     irq_enable();
