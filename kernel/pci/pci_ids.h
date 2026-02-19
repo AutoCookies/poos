@@ -1,0 +1,7 @@
+#ifndef POOS_PCI_IDS_H
+#define POOS_PCI_IDS_H
+
+#define PCI_VENDOR_REALTEK 0x10EC
+#define PCI_DEVICE_RTL8139 0x8139
+
+#endif

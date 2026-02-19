@@ -19,7 +19,7 @@ INITRD_TAR := $(BUILD_DIR)/initrd.tar
 
 INITRD_LBA := 300
 
-USER_APPS := init sh ls cat hello sleep fault cowtest mmaptest filemaptest mkdir rm mv cp sync
+USER_APPS := init sh ls cat hello sleep fault cowtest mmaptest filemaptest mkdir rm mv cp sync ifconfig ping udpsend udprecv dnslookup
 USER_ELFS := $(patsubst %,$(BUILD_DIR)/user/%.elf,$(USER_APPS))
 USER_COMMON_OBJS := $(BUILD_DIR)/user/crt0.o $(BUILD_DIR)/user/libc_min/syscall.o $(BUILD_DIR)/user/libc_min/printf_min.o $(BUILD_DIR)/user/libc_min/string.o
 
@@ -39,7 +39,8 @@ KERNEL_C_SRCS := \
 	kernel/fs/fat/fat.c kernel/fs/fat/fat_dir.c kernel/fs/fat/fat_file.c kernel/fs/fat/fat_alloc.c kernel/fs/fat/fat_debug.c \
 	kernel/ipc/ringbuf.c kernel/ipc/pipe.c kernel/tty/tty.c kernel/tty/kbd.c kernel/tty/console.c \
 	kernel/proc/signal.c kernel/proc/proc_table.c kernel/proc/fork.c kernel/proc/thread_user.c kernel/proc/mm_clone.c \
-	kernel/mm/addrspace.c kernel/mm/vma.c kernel/mm/page.c kernel/mm/cow.c kernel/mm/mmap.c kernel/mm/faults_vm.c kernel/mm/pagecache.c kernel/mm/anon.c kernel/mm/filemap.c kernel/mm/tlb.c kernel/mm/mm_debug.c
+	kernel/mm/addrspace.c kernel/mm/vma.c kernel/mm/page.c kernel/mm/cow.c kernel/mm/mmap.c kernel/mm/faults_vm.c kernel/mm/pagecache.c kernel/mm/anon.c kernel/mm/filemap.c kernel/mm/tlb.c kernel/mm/mm_debug.c \
+	kernel/pci/pci.c kernel/net/net.c kernel/net/netif.c kernel/net/pbuf.c kernel/net/checksum.c kernel/net/eth.c kernel/net/arp.c kernel/net/ipv4.c kernel/net/icmp.c kernel/net/udp.c kernel/net/dhcp.c kernel/net/dns.c kernel/net/route.c kernel/net/sock.c kernel/net/sock_api.c kernel/net/net_debug.c kernel/drivers/rtl8139.c kernel/drivers/virtio_net.c kernel/dev/devnet.c
 
 KERNEL_ASM_SRCS := kernel/entry.asm kernel/arch/x86/isr_stubs.asm kernel/arch/x86/ring3.asm kernel/arch/x86/syscall_stub.asm kernel/sched/context_switch.asm
 
@@ -72,6 +73,11 @@ $(INITRD_TAR): $(USER_ELFS) user/pack/mkinitrd.sh
 	cp $(BUILD_DIR)/user/mv.elf user/pack/rootfs/bin/mv
 	cp $(BUILD_DIR)/user/cp.elf user/pack/rootfs/bin/cp
 	cp $(BUILD_DIR)/user/sync.elf user/pack/rootfs/bin/sync
+	cp $(BUILD_DIR)/user/ifconfig.elf user/pack/rootfs/bin/ifconfig
+	cp $(BUILD_DIR)/user/ping.elf user/pack/rootfs/bin/ping
+	cp $(BUILD_DIR)/user/udpsend.elf user/pack/rootfs/bin/udpsend
+	cp $(BUILD_DIR)/user/udprecv.elf user/pack/rootfs/bin/udprecv
+	cp $(BUILD_DIR)/user/dnslookup.elf user/pack/rootfs/bin/dnslookup
 	user/pack/mkinitrd.sh user/pack/rootfs $(INITRD_TAR)
 
 $(BOOT_BIN): boot/boot.asm boot/gdt.asm
@@ -112,7 +118,7 @@ $(BUILD_DIR)/user/%.elf: $(USER_COMMON_OBJS) $(BUILD_DIR)/user/apps/%.o user/use
 	$(LD) -T user/user.ld -nostdlib -m elf_i386 -o $@ $(USER_COMMON_OBJS) $(BUILD_DIR)/user/apps/$*.o
 
 run: $(IMAGE) $(DATA_IMAGE)
-	$(QEMU) -drive format=raw,file=$(IMAGE),if=ide,index=0 -drive format=raw,file=$(DATA_IMAGE),if=ide,index=1
+	$(QEMU) -drive format=raw,file=$(IMAGE),if=ide,index=0 -drive format=raw,file=$(DATA_IMAGE),if=ide,index=1 -netdev user,id=n1,hostfwd=udp::5555-:5555 -device rtl8139,netdev=n1
 
 clean:
 	rm -rf $(BUILD_DIR)

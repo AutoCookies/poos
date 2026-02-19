@@ -27,6 +27,12 @@ int sys_mkdir(const char* path);
 int sys_unlink(const char* path);
 int sys_rename(const char* oldp,const char* newp);
 int sys_sync(void);
+int sys_socket(int domain,int type,int proto);
+int sys_bind(int fd,const void* sa,u32 len);
+int sys_sendto(int fd,const void* buf,u32 len,u32 flags,const void* sa,u32 alen);
+int sys_recvfrom(int fd,void* buf,u32 len,u32 flags,void* sa,u32* alen);
+int sys_sockclose(int fd);
+int sys_netctl(int cmd, void* buf, u32 len);
 
 void syscall_dispatch(struct trapframe* tf) {
     int ret = -38;
@@ -55,6 +61,12 @@ void syscall_dispatch(struct trapframe* tf) {
         case SYS_UNLINK: ret = sys_unlink((const char*)tf->ebx); break;
         case SYS_RENAME: ret = sys_rename((const char*)tf->ebx,(const char*)tf->ecx); break;
         case SYS_SYNC: ret = sys_sync(); break;
+        case SYS_SOCKET: ret = sys_socket((int)tf->ebx,(int)tf->ecx,(int)tf->edx); break;
+        case SYS_BIND: ret = sys_bind((int)tf->ebx,(const void*)tf->ecx,tf->edx); break;
+        case SYS_SENDTO: ret = sys_sendto((int)tf->ebx,(const void*)tf->ecx,tf->edx,tf->esi,(const void*)tf->edi,tf->ebp); break;
+        case SYS_RECVFROM: ret = sys_recvfrom((int)tf->ebx,(void*)tf->ecx,tf->edx,tf->esi,(void*)tf->edi,(u32*)tf->ebp); break;
+        case SYS_SOCKCLOSE: ret = sys_sockclose((int)tf->ebx); break;
+        case SYS_NETCTL: ret = sys_netctl((int)tf->ebx,(void*)tf->ecx,tf->edx); break;
         default: break;
     }
     tf->eax = (u32)ret;

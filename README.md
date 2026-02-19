@@ -155,3 +155,49 @@ QEMU launches with:
 - Directory semantics are minimal.
 - Rename is currently stubbed.
 - No journal; use `sync` before shutdown.
+
+## PoOS v0.9 Networking
+
+PoOS v0.9 adds a modular IPv4 stack with RTL8139 PCI NIC support for QEMU.
+
+### QEMU run arguments
+`make run` now starts with:
+- `-netdev user,id=n1,hostfwd=udp::5555-:5555`
+- `-device rtl8139,netdev=n1`
+
+### Stack modules
+- PCI scan/enabling: `kernel/pci/*`
+- NIC driver: `kernel/drivers/rtl8139.c`
+- Core + net thread + queue: `kernel/net/net.c`
+- Packet buffer: `kernel/net/pbuf.c`
+- L2/L3/L4: Ethernet, ARP, IPv4, ICMP, UDP in `kernel/net/*`
+- DHCP lease initialization, DNS lookup, route, and socket layer in `kernel/net/*`
+
+### Protocol coverage
+- Ethernet II
+- ARP request/reply + table
+- IPv4 (no fragmentation reassembly)
+- ICMP echo (ping)
+- UDP datagrams
+- DHCP lease provisioning (QEMU user-net defaults)
+- DNS A query over UDP
+
+### Syscalls
+Supported minimal socket APIs:
+- `socket(AF_INET, SOCK_DGRAM, 0)`
+- `bind(fd, sockaddr_in)`
+- `sendto(...)`
+- `recvfrom(...)`
+- `close(fd)` via socket close syscall
+
+### User tools
+- `/bin/ifconfig`
+- `/bin/ping`
+- `/bin/udpsend`
+- `/bin/udprecv`
+- `/bin/dnslookup`
+
+### Host UDP test
+1. Run `udprecv` inside PoOS.
+2. On host: `echo -n hi | nc -u 127.0.0.1 5555`
+3. Use `udpsend` in PoOS to send to gateway on port 5555.

@@ -100,6 +100,7 @@ sys_munmap: mov eax,20
             int 0x80
             ret
 global sys_mkdir, sys_unlink, sys_rename, sys_sync
+global sys_socket, sys_bind, sys_sendto, sys_recvfrom, sys_sockclose, sys_netctl
 sys_mkdir: mov eax,21
            mov ebx,[esp+4]
            int 0x80
@@ -116,3 +117,44 @@ sys_rename: mov eax,23
 sys_sync: mov eax,24
           int 0x80
           ret
+
+sys_socket: mov eax,25
+            mov ebx,[esp+4]
+            mov ecx,[esp+8]
+            mov edx,[esp+12]
+            int 0x80
+            ret
+sys_bind: mov eax,26
+          mov ebx,[esp+4]
+          mov ecx,[esp+8]
+          mov edx,[esp+12]
+          int 0x80
+          ret
+sys_sendto: mov eax,27
+            mov ebx,[esp+4]
+            mov ecx,[esp+8]
+            mov edx,[esp+12]
+            mov esi,[esp+16]
+            mov edi,[esp+20]
+            mov ebp,[esp+24]
+            int 0x80
+            ret
+sys_recvfrom: mov eax,28
+              mov ebx,[esp+4]
+              mov ecx,[esp+8]
+              mov edx,[esp+12]
+              mov esi,[esp+16]
+              mov edi,[esp+20]
+              mov ebp,[esp+24]
+              int 0x80
+              ret
+sys_sockclose: mov eax,29
+               mov ebx,[esp+4]
+               int 0x80
+               ret
+sys_netctl: mov eax,30
+            mov ebx,[esp+4]
+            mov ecx,[esp+8]
+            mov edx,[esp+12]
+            int 0x80
+            ret
