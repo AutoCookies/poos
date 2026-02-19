@@ -5,10 +5,17 @@ org 0x7C00
 %define REALMODE_STACK   0x7C00
 %define PMODE_STACK      0x0009FC00
 %define KERNEL_LBA_START 1
+%ifndef KERNEL_SECTORS
 %define KERNEL_SECTORS   256
+%endif
 %define INITRD_LOAD_ADDR 0x00180000
 %define INITRD_LBA_START 300
+%ifndef INITRD_SECTORS
 %define INITRD_SECTORS   512
+%endif
+%ifndef INITRD_BYTES
+%define INITRD_BYTES     (INITRD_SECTORS * 512)
+%endif
 %define BOOTINFO_ADDR    0x9000
 %define E820_ENTRIES_MAX 128
 
@@ -41,7 +48,7 @@ build_bootinfo:
     mov dword [di + 16], KERNEL_LOAD_ADDR
     mov dword [di + 20], 0
     mov dword [di + 24], INITRD_LOAD_ADDR
-    mov dword [di + 28], (INITRD_SECTORS * 512)
+    mov dword [di + 28], INITRD_BYTES
 
     mov di, BOOTINFO_ADDR + 32
     xor ebx, ebx

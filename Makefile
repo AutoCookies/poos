@@ -155,9 +155,15 @@ run-headless: iso
 test-full-build:
 	@tools/test_full_build.sh
 
-$(BOOT_BIN): boot/boot.asm boot/gdt.asm
+$(INITRD_TAR): initrd
+
+$(BOOT_BIN): boot/boot.asm boot/gdt.asm $(KERNEL_BIN) $(INITRD_TAR)
 	mkdir -p $(BUILD_DIR)
-	$(AS) -f bin -o $@ boot/boot.asm
+	@ksec=$$(( ($$(stat -c %s $(KERNEL_BIN)) + 511) / 512 )); \
+	 isec=$$(( ($$(stat -c %s $(INITRD_TAR)) + 511) / 512 )); \
+	 ibytes=$$(stat -c %s $(INITRD_TAR)); \
+	 echo "[boot] KERNEL_SECTORS=$$ksec INITRD_SECTORS=$$isec INITRD_BYTES=$$ibytes"; \
+	 $(AS) -f bin -D KERNEL_SECTORS=$$ksec -D INITRD_SECTORS=$$isec -D INITRD_BYTES=$$ibytes -o $@ boot/boot.asm
 
 $(KERNEL_BIN): $(KERNEL_ELF)
 	$(OBJCOPY) -O binary $< $@

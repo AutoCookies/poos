@@ -36,6 +36,16 @@ qemu-system-i386   -m 80M -smp 1   -drive format=raw,file=build/poos.iso,if=ide,
 VirtualBox note:
 - Error `VERR_VMX_IN_VMX_ROOT_MODE` means host nested virtualization/VT-x is unavailable or blocked, so the VM cannot start. This is a host hypervisor setting issue, not a PoOS image format issue.
 
+If QEMU remains at `Booting from Hard Disk...`:
+- run a fresh rebuild so boot sector metadata matches current artifact sizes:
+
+```sh
+make clean
+make iso
+```
+
+(bootloader sector counts are generated from current `kernel.bin` and `initrd.tar` at build time.)
+
 Validate artifacts:
 
 ```sh
