@@ -1,7 +1,6 @@
 #include "../libc_min/syscall.h"
 
 static int strcmp2(const char* a,const char* b){while(*a&&*b&&*a==*b){a++;b++;}return (unsigned char)*a-(unsigned char)*b;}
-static int strlen2(const char* s){int n=0;while(s[n])n++;return n;}
 
 int main(void) {
     char* p = (char*)sys_mmap(0, 4096, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
