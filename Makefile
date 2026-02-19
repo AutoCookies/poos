@@ -1,8 +1,20 @@
 CROSS ?= i686-elf
+AS := nasm
+
+ifeq ($(shell command -v $(CROSS)-gcc >/dev/null 2>&1; echo $$?),0)
 CC := $(CROSS)-gcc
 LD := $(CROSS)-ld
-AS := nasm
 OBJCOPY := $(CROSS)-objcopy
+TOOLCHAIN_DESC := cross ($(CROSS))
+else ifeq ($(shell command -v gcc >/dev/null 2>&1; echo $$?),0)
+CC := gcc
+LD := ld
+OBJCOPY := objcopy
+TOOLCHAIN_DESC := host (gcc/binutils fallback)
+else
+$(error No usable C compiler found. Install $(CROSS)-gcc or gcc)
+endif
+
 QEMU := qemu-system-i386
 PYTHON ?= python3
 
@@ -68,13 +80,19 @@ KERNEL_C_SRCS := \
 KERNEL_ASM_SRCS := kernel/entry.asm kernel/arch/x86/isr_stubs.asm kernel/arch/x86/ring3.asm kernel/arch/x86/syscall_stub.asm kernel/sched/context_switch.asm kernel/arch/x86/smp/start_ap.asm
 KERNEL_OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(KERNEL_C_SRCS)) $(patsubst %.asm,$(BUILD_DIR)/%.o,$(KERNEL_ASM_SRCS))
 
-.PHONY: all clean kernel user rootfs initrd iso verify-iso run test-full-build
+.PHONY: all clean kernel user rootfs initrd iso verify-iso run test-full-build toolchain-check
 all: iso
+
+toolchain-check:
+	@echo "[toolchain] $(TOOLCHAIN_DESC)"
+	@echo "[toolchain] CC=$(CC)"
+	@echo "[toolchain] LD=$(LD)"
+	@echo "[toolchain] OBJCOPY=$(OBJCOPY)"
 
 clean:
 	rm -rf $(BUILD_DIR)
 
-kernel: $(KERNEL_BIN)
+kernel: toolchain-check $(KERNEL_BIN)
 	@test -f $(KERNEL_BIN) || (echo "error: missing $(KERNEL_BIN)" && exit 1)
 	@echo "[ok] kernel built: $(KERNEL_BIN)"
 
