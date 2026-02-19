@@ -124,3 +124,8 @@ int sys_kill(int pid, int sig) { return proc_send_signal((u32)pid, sig); }
 
 int sys_mmap(void* addr, u32 len, int prot, int flags, int fd, u32 off) { return mm_mmap_sys(addr, len, prot, flags, fd, off); }
 int sys_munmap(void* addr, u32 len) { return mm_munmap_sys(addr, len); }
+
+int sys_mkdir(const char* upath){ char p[128]; if(copy_user_path(p,upath,sizeof(p))<0) return -1; return vfs_mkdir(p,0); }
+int sys_unlink(const char* upath){ char p[128]; if(copy_user_path(p,upath,sizeof(p))<0) return -1; return vfs_unlink(p); }
+int sys_rename(const char* uo,const char* un){ char o[128],n[128]; if(copy_user_path(o,uo,sizeof(o))<0||copy_user_path(n,un,sizeof(n))<0) return -1; return vfs_rename(o,n); }
+int sys_sync(void){ return vfs_sync(); }

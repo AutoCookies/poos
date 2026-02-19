@@ -25,6 +25,11 @@ struct vnode_ops {
     int (*write)(struct vnode* vn, u32 off, const void* buf, u32 len);
     int (*readdir)(struct vnode* vn, u32* cookie, struct vdirent* out);
     int (*getattr)(struct vnode* vn, struct vstat* out);
+    int (*create)(struct vnode* dir, const char* name, u32 mode, struct vnode** out);
+    int (*unlink)(struct vnode* dir, const char* name);
+    int (*mkdir)(struct vnode* dir, const char* name, u32 mode, struct vnode** out);
+    int (*rename)(struct vnode* olddir, const char* oldname, struct vnode* newdir, const char* newname);
+    int (*truncate)(struct vnode* vn, u32 size);
 };
 
 struct vnode {

@@ -20,6 +20,10 @@
 #include "tty/tty.h"
 #include "mm/mm.h"
 #include "mm/page.h"
+#include "blk/blkdev.h"
+#include "blk/part.h"
+#include "bcache/bcache.h"
+#include "fs/fat/fat.h"
 
 void vga_init(void);
 void vga_write(const char* s);
@@ -35,6 +39,8 @@ static void ticker(void* arg) {
         proc_reap_zombies();
     }
 }
+
+int ata_pio_init(void);
 
 void kernel_main(struct BootInfo* bootinfo) {
     irq_disable();
@@ -63,6 +69,7 @@ void kernel_main(struct BootInfo* bootinfo) {
     pit_init();
 
     vfs_init();
+    bcache_init();
     initrd_set_region(bootinfo->initrd_phys_start, bootinfo->initrd_size);
 
     struct vnode* root = 0;
@@ -78,6 +85,23 @@ void kernel_main(struct BootInfo* bootinfo) {
         vga_write("panic: failed to mount /tmp\n");
         for (;;) cpu_hlt();
     }
+    if (ata_pio_init() == 0) {
+        struct blkdev* hd0 = blkdev_get("hd0");
+        if (hd0 && part_scan_mbr(hd0) == 0) {
+            struct blkdev* p1 = blkdev_get("hd0p1");
+            struct vnode* droot = 0;
+            if (p1 && fat_mount(p1, &droot) == 0 && vfs_mount("/home", droot) == 0) {
+                vga_write("mounted /home from FAT disk\n");
+            } else {
+                vga_write("disk: FAT mount failed\n");
+            }
+        } else {
+            vga_write("disk: no MBR partition\n");
+        }
+    } else {
+        vga_write("disk: ata not found\n");
+    }
+
     vga_write("mounted / from initrd (tarfs)\n");
 
     struct file* motd = 0;

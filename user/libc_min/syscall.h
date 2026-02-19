@@ -4,7 +4,8 @@
 enum {
     SYS_WRITE = 1, SYS_EXIT, SYS_YIELD, SYS_SLEEP, SYS_GETPID,
     SYS_OPEN, SYS_CLOSE, SYS_READ, SYS_LSEEK, SYS_STAT, SYS_GETDENTS,
-    SYS_EXECVE, SYS_WAITPID, SYS_SPAWN, SYS_FORK, SYS_PIPE, SYS_DUP2, SYS_KILL, SYS_MMAP, SYS_MUNMAP
+    SYS_EXECVE, SYS_WAITPID, SYS_SPAWN, SYS_FORK, SYS_PIPE, SYS_DUP2, SYS_KILL, SYS_MMAP, SYS_MUNMAP,
+    SYS_MKDIR, SYS_UNLINK, SYS_RENAME, SYS_SYNC
 };
 
 struct vstat { unsigned int mode, size, type; };
@@ -51,3 +52,8 @@ int sys_munmap(void* addr, int len);
 #define MAP_SHARED 0x02
 #define MAP_FIXED 0x10
 #define MAP_ANON 0x20
+
+int sys_mkdir(const char* path);
+int sys_unlink(const char* path);
+int sys_rename(const char* oldp, const char* newp);
+int sys_sync(void);

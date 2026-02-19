@@ -23,6 +23,10 @@ int sys_dup2(int oldfd, int newfd);
 int sys_kill(int pid, int sig);
 int sys_mmap(void* addr, u32 len, int prot, int flags, int fd, u32 off);
 int sys_munmap(void* addr, u32 len);
+int sys_mkdir(const char* path);
+int sys_unlink(const char* path);
+int sys_rename(const char* oldp,const char* newp);
+int sys_sync(void);
 
 void syscall_dispatch(struct trapframe* tf) {
     int ret = -38;
@@ -47,6 +51,10 @@ void syscall_dispatch(struct trapframe* tf) {
         case SYS_KILL: ret = sys_kill((int)tf->ebx, (int)tf->ecx); break;
         case SYS_MMAP: ret = sys_mmap((void*)tf->ebx, tf->ecx, (int)tf->edx, (int)tf->esi, (int)tf->edi, tf->ebp); break;
         case SYS_MUNMAP: ret = sys_munmap((void*)tf->ebx, tf->ecx); break;
+        case SYS_MKDIR: ret = sys_mkdir((const char*)tf->ebx); break;
+        case SYS_UNLINK: ret = sys_unlink((const char*)tf->ebx); break;
+        case SYS_RENAME: ret = sys_rename((const char*)tf->ebx,(const char*)tf->ecx); break;
+        case SYS_SYNC: ret = sys_sync(); break;
         default: break;
     }
     tf->eax = (u32)ret;
