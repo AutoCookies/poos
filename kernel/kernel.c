@@ -24,6 +24,8 @@
 #include "blk/part.h"
 #include "bcache/bcache.h"
 #include "fs/fat/fat.h"
+#include "pci/pci.h"
+#include "net/net.h"
 
 void vga_init(void);
 void vga_write(const char* s);
@@ -41,12 +43,13 @@ static void ticker(void* arg) {
 }
 
 int ata_pio_init(void);
+int rtl8139_init(void);
 
 void kernel_main(struct BootInfo* bootinfo) {
     irq_disable();
 
     vga_init();
-    vga_write("PoOS v0.7 booting...\n");
+    vga_write("PoOS v0.9 booting...\n");
 
     gdt_init();
     irq_init();
@@ -113,6 +116,14 @@ void kernel_main(struct BootInfo* bootinfo) {
     }
 
     kthread_create("ticker", ticker, 0, 0);
+    pci_init();
+    net_init();
+    if (rtl8139_init() == 0) {
+        vga_write("net: rtl8139 ready\n");
+    } else {
+        vga_write("net: no rtl8139\n");
+    }
+
 
     vga_write("launching /sbin/init\n");
     if (proc_spawn_path("/sbin/init", 0) < 0) {

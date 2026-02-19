@@ -129,3 +129,10 @@ int sys_mkdir(const char* upath){ char p[128]; if(copy_user_path(p,upath,sizeof(
 int sys_unlink(const char* upath){ char p[128]; if(copy_user_path(p,upath,sizeof(p))<0) return -1; return vfs_unlink(p); }
 int sys_rename(const char* uo,const char* un){ char o[128],n[128]; if(copy_user_path(o,uo,sizeof(o))<0||copy_user_path(n,un,sizeof(n))<0) return -1; return vfs_rename(o,n); }
 int sys_sync(void){ return vfs_sync(); }
+
+#include "../net/netif.h"
+#include "../net/icmp.h"
+#include "../net/dns.h"
+
+struct netinfo_u {u8 mac[6];u32 ip,mask,gw,dns;u32 rx,tx,drops;};
+int sys_netctl(int cmd, void* ubuf, u32 len){ netif_t* n=netif_default(); if(!n) return -1; if(cmd==1){ if(len<sizeof(struct netinfo_u)) return -1; struct netinfo_u i; for(int k=0;k<6;k++) i.mac[k]=n->mac[k]; i.ip=n->ip; i.mask=n->netmask; i.gw=n->gw; i.dns=n->dns; i.rx=n->stats.rx_packets; i.tx=n->stats.tx_packets; i.drops=n->stats.rx_drops+n->stats.tx_drops; return copy_to_user(ubuf,&i,sizeof(i)); } if(cmd==2){ if(len<4) return -1; u32 ip; if(copy_from_user(&ip,ubuf,4)<0) return -1; return icmp_ping(ip,0x55AA,1,1000); } if(cmd==3){ char host[64]; if(len>=sizeof(host)) len=sizeof(host)-1; if(copy_from_user(host,ubuf,len)<0) return -1; host[len]=0; u32 ip=0; if(dns_lookup_a(host,&ip)<0) return -1; return copy_to_user(ubuf,&ip,4); } return -1; }
