@@ -237,3 +237,22 @@ sys_settime: mov eax,46
              mov ebx,[esp+4]
              int 0x80
              ret
+global sys_clone, sys_unshare, sys_seccomp, sys_cgset
+sys_clone: mov eax,47
+           mov ebx,[esp+4]
+           int 0x80
+           ret
+sys_unshare: mov eax,48
+             mov ebx,[esp+4]
+             int 0x80
+             ret
+sys_seccomp: mov eax,49
+             mov ebx,[esp+4]
+             int 0x80
+             ret
+sys_cgset: mov eax,50
+           mov ebx,[esp+4]
+           mov ecx,[esp+8]
+           mov edx,[esp+12]
+           int 0x80
+           ret

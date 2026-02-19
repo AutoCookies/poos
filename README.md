@@ -357,3 +357,54 @@ Edit `/etc/passwd`, `/etc/group`, and `/etc/shadow` inside initrd rootfs and reb
 
 - TLS 1.2 handshake and HTTPS data path are not fully enabled in this snapshot.
 - TLS 1.3, OCSP, and CRL checks are not yet implemented.
+
+## PoOS v1.4 containers-lite sandboxing
+
+PoOS v1.4 introduces a minimal container substrate with namespace, cgroup, and seccomp-like isolation plumbing.
+
+### Namespaces
+
+- New namespace subsystem under `kernel/ns/` with `nsproxy` wiring for per-process mount/pid/net/uts/user namespace references.
+- `unshare`/`clone` control flags support creating new namespace views (`CLONE_NEWNS`, `CLONE_NEWPID`, `CLONE_NEWNET`, `CLONE_NEWUTS`, `CLONE_NEWUSER`).
+- Mount namespace root is used by path resolution through `proc_current_root()` for per-sandbox rootfs view.
+- PID namespace has independent virtual PID allocation (`pid_ns` allocator); `getpid()` returns namespace pid.
+- UTS namespace carries per-namespace hostname.
+- User namespace includes a minimal uid mapping structure suitable for root-inside to non-root-outside mappings.
+
+### Cgroups
+
+- Added minimal cgroup core under `kernel/cgroup/`.
+- Per-cgroup limits: pids, memory budget field, and cpu percentage field.
+- `fork/clone` path enforces pids controller limit (`-EAGAIN`-like failure in limit reached case).
+- Counters and lifecycle hooks include pids current count, throttle/oom counters, and audit event on cgroup creation.
+
+### Seccomp-like filtering
+
+- Added per-process seccomp filter object under `kernel/seccomp/`.
+- Supports modes:
+  - `SECCOMP_MODE_DISABLED`
+  - `SECCOMP_MODE_STRICT` (allowlist baseline)
+- Syscall dispatcher checks filter before executing handlers; denied calls are audited and blocked.
+
+### poosrun sandbox runtime
+
+- Added `/bin/poosrun` user app.
+- Supports:
+  - `--root <path>`
+  - `--net=none|host`
+  - `--mem <MiB>`
+  - `--pids <n>`
+  - `--cpu <percent>`
+  - `--seccomp=off`
+- Runtime flow:
+  1. `unshare` namespace flags
+  2. `chroot` to sandbox root
+  3. set cgroup limits
+  4. apply seccomp mode
+  5. `execve` target command
+
+### Limitations
+
+- Network namespace currently toggles host-net access on/off; virtual interfaces/veth/NAT are not yet implemented.
+- cgroup memory/cpu quota fields are plumbed and observable, with pids controller being the hard-enforced controller in this snapshot.
+- `setns()` and argument-level seccomp filters are reserved for follow-up.

@@ -2,6 +2,8 @@
 #include "../arch/x86/idt.h"
 #include "sys_defs.h"
 #include "../mm/mmap.h"
+#include "../proc/task.h"
+#include "../seccomp/seccomp.h"
 
 int sys_write(int fd, const void* buf, u32 len);
 int sys_exit(int code);
@@ -43,9 +45,18 @@ int sys_auth(const char* user,const char* pass,u32* uid,u32* gid);
 int sys_getrandom(void* buf,u32 len,u32 flags);
 int sys_time(void);
 int sys_settime(u32 epoch);
+int sys_clone(u32 flags, struct trapframe* tf);
+int sys_unshare(u32 flags);
+int sys_seccomp(u32 mode);
+int sys_cgset(u32 mem,u32 pids,u32 cpu);
 
 void syscall_dispatch(struct trapframe* tf) {
     int ret = -38;
+    struct task* t = task_current();
+    if (t && t->owner && t->owner->seccomp && seccomp_check(t->owner->seccomp, tf->eax) < 0) {
+        tf->eax = (u32)-1;
+        return;
+    }
     switch (tf->eax) {
         case SYS_WRITE: ret = sys_write((int)tf->ebx, (const void*)tf->ecx, tf->edx); break;
         case SYS_EXIT: ret = sys_exit((int)tf->ebx); break;
@@ -93,6 +104,10 @@ void syscall_dispatch(struct trapframe* tf) {
         case SYS_GETRANDOM: ret = sys_getrandom((void*)tf->ebx,tf->ecx,tf->edx); break;
         case SYS_TIME: ret = sys_time(); break;
         case SYS_SETTIME: ret = sys_settime(tf->ebx); break;
+        case SYS_CLONE: ret = sys_clone(tf->ebx, tf); break;
+        case SYS_UNSHARE: ret = sys_unshare(tf->ebx); break;
+        case SYS_SECCOMP: ret = sys_seccomp(tf->ebx); break;
+        case SYS_CGSET: ret = sys_cgset(tf->ebx, tf->ecx, tf->edx); break;
         default: break;
     }
     tf->eax = (u32)ret;

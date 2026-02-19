@@ -20,6 +20,9 @@ struct trapframe;
 struct addrspace;
 struct cred;
 struct vnode;
+struct nsproxy;
+struct cgroup;
+struct seccomp_filter;
 
 typedef enum { PROC_RUNNING = 0, PROC_ZOMBIE, PROC_DEAD } proc_state_t;
 
@@ -42,6 +45,10 @@ struct proc {
     struct addrspace* as;
     struct cred* cred;
     struct vnode* root_vnode;
+    struct nsproxy* nsproxy;
+    struct cgroup* cgrp;
+    u32 pid_ns;
+    struct seccomp_filter* seccomp;
     struct proc* next;
 };
 
@@ -65,5 +72,9 @@ int proc_setuid(u32 uid);
 int proc_setgid(u32 gid);
 int proc_capset(u32 pid, u32 caps);
 int proc_chroot(const char* path);
+int proc_clone(u32 flags, struct trapframe* tf);
+int proc_unshare(u32 flags);
+int proc_setns(int fd, u32 nstype);
+int proc_attach_cgroup(struct proc* p, struct cgroup* cg);
 
 #endif
