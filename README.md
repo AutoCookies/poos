@@ -481,3 +481,35 @@ Run:
 
 - TLS transport stack remains scaffolded in this tree and is not production-enabled yet.
 - Throughput is intentionally constrained by fixed buffer pools and conservative memory caps.
+
+## PoOS Edge80-Prox (`proxyd`)
+
+`proxyd` is a memory-bounded reverse-proxy fetcher/cache agent designed for Edge80 limits. In this build it supports strict bounded caching and upstream HTTP fetch, but PoOS still lacks a user-visible TCP listen/accept syscall, so daemon socket-accept mode is intentionally degraded.
+
+### Command
+
+```sh
+proxyd --listen 443 --upstream 10.42.0.2:8080 --cache-mem 8M --cache-disk 32M --path /index.html
+```
+
+### Memory bounds
+
+- Memory cache hard cap: configurable (default `8M`, upper bound compiled at 8 MiB arena).
+- Disk cache hard cap: configurable (default `32M`).
+- Memory index cap: 2048 entries.
+- Disk index cap: 4096 entries.
+- Object caps:
+  - memory tier: `<= 64KiB`
+  - disk tier: `<= 1MiB`
+
+### Cache policy
+
+- Cacheable responses: `HTTP/1.1 200` + `Cache-Control: max-age=N`.
+- Other responses are streamed/passthrough only (no cache insert).
+- TTL expiry causes eviction-on-access.
+
+### Operational notes
+
+- Use `--stats` to print bounded cache counters.
+- Current transport path is upstream client mode (`GET`) with fixed memory buffers and no dynamic allocation.
+- `--listen` is accepted for forward-compatibility but currently informational due to kernel socket API limits (no listen/accept syscall yet).
