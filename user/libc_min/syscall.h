@@ -8,7 +8,8 @@ enum {
     SYS_MKDIR, SYS_UNLINK, SYS_RENAME, SYS_SYNC,
     SYS_SOCKET, SYS_BIND, SYS_CONNECT, SYS_SEND, SYS_RECV, SYS_SENDTO, SYS_RECVFROM, SYS_SOCKCLOSE, SYS_NETCTL,
     SYS_GETUID, SYS_SETUID, SYS_GETEUID, SYS_CHMOD, SYS_CHOWN, SYS_UMASK, SYS_CHROOT, SYS_CAPGET, SYS_CAPSET, SYS_AUTH,
-    SYS_GETRANDOM, SYS_TIME, SYS_SETTIME, SYS_CLONE, SYS_UNSHARE, SYS_SECCOMP, SYS_CGSET
+    SYS_GETRANDOM, SYS_TIME, SYS_SETTIME, SYS_CLONE, SYS_UNSHARE, SYS_SECCOMP, SYS_CGSET,
+    SYS_MEMSTAT, SYS_MEMINFO, SYS_SYSCTL
 };
 
 struct vstat { unsigned int mode, size, type, uid, gid; };
@@ -30,6 +31,8 @@ struct netns_pfwd_req {
 
 struct mem_budget_entry_u { unsigned int cap, used, peak, refused; };
 struct memstat_u { struct mem_budget_entry_u cat[8]; unsigned int dropped_packets, refused_connections, oom_kills; };
+
+struct meminfo_u { unsigned int total_bytes, free_bytes; };
 
 static inline int syscall0(int n){int r;__asm__ volatile("int $0x80":"=a"(r):"a"(n):"memory");return r;}
 static inline int syscall1(int n,int a){int r;__asm__ volatile("int $0x80":"=a"(r):"a"(n),"b"(a):"memory");return r;}
@@ -68,6 +71,8 @@ int sys_time(void);
 int sys_settime(int epoch);
 int sys_clone(int flags); int sys_unshare(int flags); int sys_seccomp(int mode); int sys_cgset(int mem,int pids,int cpu);
 int sys_memstat(struct memstat_u* out, int len);
+int sys_meminfo(struct meminfo_u* out, int len);
+int sys_sysctl(int op, int key, unsigned int* value);
 
 #endif
 

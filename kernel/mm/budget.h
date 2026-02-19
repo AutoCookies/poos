@@ -32,6 +32,7 @@ void mm_budget_init(void);
 int mm_budget_try_charge(enum mm_budget_cat cat, u32 bytes);
 void mm_budget_uncharge(enum mm_budget_cat cat, u32 bytes);
 void mm_budget_set_used(enum mm_budget_cat cat, u32 bytes);
+void mm_budget_set_cap(enum mm_budget_cat cat, u32 cap);
 void mm_budget_inc_drop_packets(void);
 void mm_budget_inc_refused_connections(void);
 void mm_budget_inc_oom_kills(void);

@@ -55,6 +55,8 @@ enum {
     SYS_SECCOMP = 49,
     SYS_CGSET = 50,
     SYS_MEMSTAT = 51,
+    SYS_MEMINFO = 52,
+    SYS_SYSCTL = 53,
 };
 
 #endif
