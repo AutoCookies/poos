@@ -17,10 +17,10 @@
 #include "../cgroup/cgroup.h"
 #include "../ns/ns.h"
 #include "../ns/ns_proxy.h"
+#include "../ns/netns.h"
 
 void vga_write(const char*);
 
-static int netns_allowed(void){ struct task* t=task_current(); return (t&&t->owner&&t->owner->nsproxy&&t->owner->nsproxy->net&&t->owner->nsproxy->net->allow_host_net); }
 
 static int copy_user_path(char* kbuf, const char* upath, u32 n) {
     u32 len = 0;
@@ -147,7 +147,71 @@ int sys_sync(void){ return vfs_sync(); }
 #include "../net/dns.h"
 
 struct netinfo_u {u8 mac[6];u32 ip,mask,gw,dns;u32 rx,tx,drops;};
-int sys_netctl(int cmd, void* ubuf, u32 len){ if(!netns_allowed()) return -1; netif_t* n=netif_default(); if(!n) return -1; if(cmd==1){ if(len<sizeof(struct netinfo_u)) return -1; struct netinfo_u i; for(int k=0;k<6;k++) i.mac[k]=n->mac[k]; i.ip=n->ip; i.mask=n->netmask; i.gw=n->gw; i.dns=n->dns; i.rx=n->stats.rx_packets; i.tx=n->stats.tx_packets; i.drops=n->stats.rx_drops+n->stats.tx_drops; return copy_to_user(ubuf,&i,sizeof(i)); } if(cmd==2){ struct cred* c=cred_current(); if(!c||!cred_has_cap(c,CAP_NET_RAW)) return -1; if(len<4) return -1; u32 ip; if(copy_from_user(&ip,ubuf,4)<0) return -1; return icmp_ping(ip,0x55AA,1,1000); } if(cmd==3){ char host[64]; if(len>=sizeof(host)) len=sizeof(host)-1; if(copy_from_user(host,ubuf,len)<0) return -1; host[len]=0; u32 ip=0; if(dns_lookup_a(host,&ip)<0) return -1; return copy_to_user(ubuf,&ip,4); } return -1; }
+struct netns_diag_u {
+    u32 nsid;
+    u32 bridge_ip;
+    u32 bridge_mask;
+    u32 container_ip;
+    u32 nat_enabled;
+    char veth_host[8];
+    char veth_peer[8];
+    char bridge[8];
+    u32 bridge_rx;
+    u32 bridge_tx;
+    u32 nat_pkts;
+    u32 nat_bytes;
+    u32 pfwd_hits;
+    u32 drops;
+};
+struct netns_pfwd_req { u16 host_port; u16 container_port; u32 container_ip; u8 proto; u8 _pad[3]; };
+
+int sys_netctl(int cmd, void* ubuf, u32 len){
+    netif_t* n=netif_default();
+    struct net_ns* ns = netns_current();
+    if(!n || !ns) return -1;
+    if(cmd==1){
+        if(!netns_allowed()) return -1;
+        if(len<sizeof(struct netinfo_u)) return -1;
+        struct netinfo_u i;
+        for(int k=0;k<6;k++) i.mac[k]=n->mac[k];
+        i.ip=n->ip; i.mask=n->netmask; i.gw=n->gw; i.dns=n->dns;
+        i.rx=n->stats.rx_packets; i.tx=n->stats.tx_packets; i.drops=n->stats.rx_drops+n->stats.tx_drops;
+        return copy_to_user(ubuf,&i,sizeof(i));
+    }
+    if(cmd==2){
+        if(!netns_allowed()) return -1;
+        struct cred* c=cred_current(); if(!c||!cred_has_cap(c,CAP_NET_RAW)) return -1;
+        if(len<4) return -1; u32 ip; if(copy_from_user(&ip,ubuf,4)<0) return -1;
+        return icmp_ping(ip,0x55AA,1,1000);
+    }
+    if(cmd==3){
+        if(!netns_allowed()) return -1;
+        char host[64]; if(len>=sizeof(host)) len=sizeof(host)-1;
+        if(copy_from_user(host,ubuf,len)<0) return -1; host[len]=0;
+        u32 ip=0; if(dns_lookup_a(host,&ip)<0) return -1;
+        return copy_to_user(ubuf,&ip,4);
+    }
+    if(cmd==10){
+        struct netns_diag_u d;
+        if(netns_fill_diag(ns,&d,sizeof(d))<0) return -1;
+        return copy_to_user(ubuf,&d,sizeof(d));
+    }
+    if(cmd==11){
+        struct cred* c=cred_current(); if(!c||!cred_has_cap(c,CAP_NET_ADMIN)) return -1;
+        struct netns_pfwd_req r;
+        if(len<sizeof(r)) return -1;
+        if(copy_from_user(&r,ubuf,sizeof(r))<0) return -1;
+        return netns_add_port_forward(ns,r.host_port,r.container_ip,r.container_port,r.proto);
+    }
+    if(cmd==12){
+        struct cred* c=cred_current(); if(!c||!cred_has_cap(c,CAP_NET_ADMIN)) return -1;
+        u32 on=0; if(len<4) return -1;
+        if(copy_from_user(&on,ubuf,4)<0) return -1;
+        ns->nat_enabled = on ? 1 : 0;
+        return 0;
+    }
+    return -1;
+}
 
 int sys_getuid(void){ struct cred* c=cred_current(); return c?(int)c->uid:-1; }
 int sys_geteuid(void){ struct cred* c=cred_current(); return c?(int)c->euid:-1; }
