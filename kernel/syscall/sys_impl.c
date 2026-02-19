@@ -13,8 +13,14 @@
 #include "../sec/auth.h"
 #include "../vfs/vfs_perm.h"
 #include "../crypto/rng.h"
+#include "../seccomp/seccomp.h"
+#include "../cgroup/cgroup.h"
+#include "../ns/ns.h"
+#include "../ns/ns_proxy.h"
 
 void vga_write(const char*);
+
+static int netns_allowed(void){ struct task* t=task_current(); return (t&&t->owner&&t->owner->nsproxy&&t->owner->nsproxy->net&&t->owner->nsproxy->net->allow_host_net); }
 
 static int copy_user_path(char* kbuf, const char* upath, u32 n) {
     u32 len = 0;
@@ -34,7 +40,7 @@ int sys_write_compat(const char* uptr, u32 len) {
 int sys_exit(int code) { proc_kill_current(code); return 0; }
 int sys_yield(void) { kthread_yield(); return 0; }
 int sys_sleep(u32 ms) { kthread_sleep(time_ms_to_ticks(ms)); return 0; }
-int sys_getpid(void) { struct task* t = task_current(); return (t && t->owner) ? (int)t->owner->pid : 0; }
+int sys_getpid(void) { struct task* t = task_current(); return (t && t->owner) ? (int)t->owner->pid_ns : 0; }
 
 int sys_open(const char* upath, u32 flags) {
     char path[128];
@@ -141,7 +147,7 @@ int sys_sync(void){ return vfs_sync(); }
 #include "../net/dns.h"
 
 struct netinfo_u {u8 mac[6];u32 ip,mask,gw,dns;u32 rx,tx,drops;};
-int sys_netctl(int cmd, void* ubuf, u32 len){ netif_t* n=netif_default(); if(!n) return -1; if(cmd==1){ if(len<sizeof(struct netinfo_u)) return -1; struct netinfo_u i; for(int k=0;k<6;k++) i.mac[k]=n->mac[k]; i.ip=n->ip; i.mask=n->netmask; i.gw=n->gw; i.dns=n->dns; i.rx=n->stats.rx_packets; i.tx=n->stats.tx_packets; i.drops=n->stats.rx_drops+n->stats.tx_drops; return copy_to_user(ubuf,&i,sizeof(i)); } if(cmd==2){ struct cred* c=cred_current(); if(!c||!cred_has_cap(c,CAP_NET_RAW)) return -1; if(len<4) return -1; u32 ip; if(copy_from_user(&ip,ubuf,4)<0) return -1; return icmp_ping(ip,0x55AA,1,1000); } if(cmd==3){ char host[64]; if(len>=sizeof(host)) len=sizeof(host)-1; if(copy_from_user(host,ubuf,len)<0) return -1; host[len]=0; u32 ip=0; if(dns_lookup_a(host,&ip)<0) return -1; return copy_to_user(ubuf,&ip,4); } return -1; }
+int sys_netctl(int cmd, void* ubuf, u32 len){ if(!netns_allowed()) return -1; netif_t* n=netif_default(); if(!n) return -1; if(cmd==1){ if(len<sizeof(struct netinfo_u)) return -1; struct netinfo_u i; for(int k=0;k<6;k++) i.mac[k]=n->mac[k]; i.ip=n->ip; i.mask=n->netmask; i.gw=n->gw; i.dns=n->dns; i.rx=n->stats.rx_packets; i.tx=n->stats.tx_packets; i.drops=n->stats.rx_drops+n->stats.tx_drops; return copy_to_user(ubuf,&i,sizeof(i)); } if(cmd==2){ struct cred* c=cred_current(); if(!c||!cred_has_cap(c,CAP_NET_RAW)) return -1; if(len<4) return -1; u32 ip; if(copy_from_user(&ip,ubuf,4)<0) return -1; return icmp_ping(ip,0x55AA,1,1000); } if(cmd==3){ char host[64]; if(len>=sizeof(host)) len=sizeof(host)-1; if(copy_from_user(host,ubuf,len)<0) return -1; host[len]=0; u32 ip=0; if(dns_lookup_a(host,&ip)<0) return -1; return copy_to_user(ubuf,&ip,4); } return -1; }
 
 int sys_getuid(void){ struct cred* c=cred_current(); return c?(int)c->uid:-1; }
 int sys_geteuid(void){ struct cred* c=cred_current(); return c?(int)c->euid:-1; }
@@ -157,3 +163,8 @@ int sys_auth(const char* uuser,const char* upass,u32* uuid,u32* ugid){ char user
 int sys_getrandom(void* ubuf, u32 len, u32 flags){ (void)flags; if(len>256) len=256; u8 kbuf[256]; if(rng_get_bytes(kbuf,len)<0) return -1; if(copy_to_user(ubuf,kbuf,len)<0) return -1; return (int)len; }
 int sys_time(void){ return (int)time_epoch(); }
 int sys_settime(u32 epoch){ struct cred* c=cred_current(); if(!c||!cred_has_cap(c,CAP_SYS_ADMIN)) return -1; time_set_epoch(epoch); return 0; }
+
+int sys_clone(u32 flags, struct trapframe* tf){ return proc_clone(flags, tf); }
+int sys_unshare(u32 flags){ return proc_unshare(flags); }
+int sys_seccomp(u32 mode){ struct task* t=task_current(); if(!t||!t->owner||!t->owner->seccomp) return -1; seccomp_init_filter(t->owner->seccomp, mode); audit_log("seccomp.set"); return 0; }
+int sys_cgset(u32 mem,u32 pids,u32 cpu){ struct task* t=task_current(); if(!t||!t->owner||!t->owner->cgrp) return -1; return cgroup_set_limits(t->owner->cgrp,mem,pids,cpu); }

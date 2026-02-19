@@ -19,7 +19,7 @@ INITRD_TAR := $(BUILD_DIR)/initrd.tar
 
 INITRD_LBA := 300
 
-USER_APPS := init sh ls cat hello sleep fault cowtest mmaptest filemaptest mkdir rm mv cp sync ifconfig ping udpsend udprecv dnslookup httpget httpsget tlsprobe tcptest schedtest iotest nettest mmtest cpustat ps iostat locks login su id chmod chown umask passwd
+USER_APPS := init sh ls cat hello sleep fault cowtest mmaptest filemaptest mkdir rm mv cp sync ifconfig ping udpsend udprecv dnslookup httpget httpsget tlsprobe tcptest schedtest iotest nettest mmtest cpustat ps iostat locks login su id chmod chown umask passwd poosrun
 USER_ELFS := $(patsubst %,$(BUILD_DIR)/user/%.elf,$(USER_APPS))
 USER_COMMON_OBJS := $(BUILD_DIR)/user/crt0.o $(BUILD_DIR)/user/libc_min/syscall.o $(BUILD_DIR)/user/libc_min/printf_min.o $(BUILD_DIR)/user/libc_min/string.o
 
@@ -33,6 +33,10 @@ KERNEL_C_SRCS := \
 	kernel/syscall/syscall.c kernel/syscall/sys_dispatch.c kernel/syscall/sys_impl.c \
 	kernel/sec/cred.c kernel/sec/auth.c kernel/sec/caps.c kernel/sec/audit.c kernel/sec/sec_debug.c \
 	kernel/proc/proc_cred.c kernel/proc/exec_secure.c kernel/proc/ns.c kernel/proc/session.c \
+	kernel/proc/clone.c kernel/proc/proc_ns.c kernel/proc/proc_cgroup.c \
+	kernel/ns/ns.c kernel/ns/mntns.c kernel/ns/pidns.c kernel/ns/netns.c kernel/ns/utsns.c kernel/ns/userns.c kernel/ns/ns_proxy.c \
+	kernel/cgroup/cgroup.c kernel/cgroup/cg_cpu.c kernel/cgroup/cg_mem.c kernel/cgroup/cg_pids.c kernel/cgroup/cg_debug.c \
+	kernel/seccomp/seccomp.c kernel/seccomp/seccomp_rules.c kernel/seccomp/seccomp_debug.c \
 	kernel/vfs/vfs_perm.c \
 	kernel/vfs/vnode.c kernel/vfs/vfs.c kernel/vfs/path.c kernel/vfs/file.c kernel/vfs/fdtable.c kernel/vfs/mount.c kernel/vfs/vfs_debug.c \
 	kernel/fs/initrd.c kernel/fs/tarfs.c kernel/fs/devfs.c kernel/fs/memfs.c \
@@ -105,6 +109,7 @@ $(INITRD_TAR): $(USER_ELFS) user/pack/mkinitrd.sh
 	cp $(BUILD_DIR)/user/chown.elf user/pack/rootfs/bin/chown
 	cp $(BUILD_DIR)/user/umask.elf user/pack/rootfs/bin/umask
 	cp $(BUILD_DIR)/user/passwd.elf user/pack/rootfs/bin/passwd
+	cp $(BUILD_DIR)/user/poosrun.elf user/pack/rootfs/bin/poosrun
 	user/pack/mkinitrd.sh user/pack/rootfs $(INITRD_TAR)
 
 $(BOOT_BIN): boot/boot.asm boot/gdt.asm

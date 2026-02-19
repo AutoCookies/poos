@@ -18,6 +18,9 @@
 #include "../vfs/mount.h"
 #include "../vfs/vnode.h"
 #include "../sec/cred.h"
+#include "../ns/ns_proxy.h"
+#include "../cgroup/cgroup.h"
+#include "../seccomp/seccomp.h"
 
 u32 pid_alloc(void);
 int proc_setup_user_stack(struct proc* p, u32* out_esp);
@@ -38,7 +41,7 @@ static void proc_setup_stdio(struct proc* p) {
     p->fdt.files[2] = cons;
 }
 
-void proc_init(void) { g_procs = 0; g_kernel_cr3 = cpu_read_cr3(); }
+void proc_init(void) { g_procs = 0; g_kernel_cr3 = cpu_read_cr3(); cgroup_init(); }
 
 struct proc* proc_find(u32 pid) {
     if (pid == 0) return g_procs;
@@ -56,6 +59,7 @@ static u32 alloc_pagedir(void) {
 }
 
 struct proc* proc_create(const char* name, struct proc* parent) {
+    if (parent && parent->cgrp && !cgroup_can_fork(parent->cgrp)) return 0;
     struct proc* p = (struct proc*)kmalloc(sizeof(struct proc), 8);
     if (!p) return 0;
     mem_set(p, 0, sizeof(*p));
@@ -75,6 +79,15 @@ struct proc* proc_create(const char* name, struct proc* parent) {
     else p->cred = cred_alloc_root();
     p->root_vnode = parent ? parent->root_vnode : mount_root();
     if (p->root_vnode) vnode_ref(p->root_vnode);
+    p->nsproxy = parent ? nsproxy_clone(parent->nsproxy, 0, p->root_vnode) : nsproxy_create_host(p->root_vnode);
+    p->pid_ns = p->nsproxy ? pidns_alloc(p->nsproxy->pid) : p->pid;
+    p->cgrp = parent ? parent->cgrp : cgroup_root();
+    if (p->cgrp) { cgroup_get(p->cgrp); cgroup_join(p->cgrp, p); }
+    p->seccomp = (struct seccomp_filter*)kmalloc(sizeof(struct seccomp_filter), 8);
+    if (p->seccomp) {
+        if (parent && parent->seccomp) mem_cpy(p->seccomp, parent->seccomp, sizeof(struct seccomp_filter));
+        else seccomp_init_filter(p->seccomp, SECCOMP_MODE_DISABLED);
+    }
     p->next = g_procs; g_procs = p;
     return p;
 }
@@ -136,6 +149,7 @@ void proc_child_event(struct proc* parent) { if (parent) { parent->pending_signa
 void proc_kill_current(int code) {
     struct task* t = task_current();
     if (t && t->owner) {
+        if (t->owner->cgrp) cgroup_leave(t->owner->cgrp);
         t->owner->state = PROC_ZOMBIE;
         t->owner->exit_code = code;
         proc_child_event(t->owner->parent);

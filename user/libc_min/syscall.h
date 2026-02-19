@@ -8,7 +8,7 @@ enum {
     SYS_MKDIR, SYS_UNLINK, SYS_RENAME, SYS_SYNC,
     SYS_SOCKET, SYS_BIND, SYS_CONNECT, SYS_SEND, SYS_RECV, SYS_SENDTO, SYS_RECVFROM, SYS_SOCKCLOSE, SYS_NETCTL,
     SYS_GETUID, SYS_SETUID, SYS_GETEUID, SYS_CHMOD, SYS_CHOWN, SYS_UMASK, SYS_CHROOT, SYS_CAPGET, SYS_CAPSET, SYS_AUTH,
-    SYS_GETRANDOM, SYS_TIME, SYS_SETTIME
+    SYS_GETRANDOM, SYS_TIME, SYS_SETTIME, SYS_CLONE, SYS_UNSHARE, SYS_SECCOMP, SYS_CGSET
 };
 
 struct vstat { unsigned int mode, size, type, uid, gid; };
@@ -51,5 +51,14 @@ int sys_auth(const char* user,const char* pass,int* uid,int* gid);
 int sys_getrandom(void* buf, int len, int flags);
 int sys_time(void);
 int sys_settime(int epoch);
+int sys_clone(int flags); int sys_unshare(int flags); int sys_seccomp(int mode); int sys_cgset(int mem,int pids,int cpu);
 
 #endif
+
+#define CLONE_NEWNS (1u<<0)
+#define CLONE_NEWPID (1u<<1)
+#define CLONE_NEWNET (1u<<2)
+#define CLONE_NEWUTS (1u<<3)
+#define CLONE_NEWUSER (1u<<4)
+#define SECCOMP_MODE_DISABLED 0
+#define SECCOMP_MODE_STRICT 1

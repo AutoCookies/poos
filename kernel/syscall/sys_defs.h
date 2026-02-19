@@ -50,6 +50,10 @@ enum {
     SYS_GETRANDOM = 44,
     SYS_TIME = 45,
     SYS_SETTIME = 46,
+    SYS_CLONE = 47,
+    SYS_UNSHARE = 48,
+    SYS_SECCOMP = 49,
+    SYS_CGSET = 50,
 };
 
 #endif
