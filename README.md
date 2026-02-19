@@ -2,6 +2,33 @@
 
 PoOS v0.6 adds Unix-like process control + IPC on top of the v0.5 VFS/initrd base: `fork`, `waitpid`, `pipe`, `dup2`, interactive TTY input, basic signal defaults, and writable `/tmp` via memfs.
 
+## Build ISO (quick start)
+
+```sh
+make clean
+make iso
+```
+
+This produces:
+- `build/poos.iso`
+- `build/kernel.bin`
+- `build/initrd.tar`
+- `build/iso-root/`
+
+Validate artifacts:
+
+```sh
+make verify-iso
+# or directly:
+./tools/verify_iso.sh
+```
+
+Run the full build + verify + boot smoke test:
+
+```sh
+./tools/test_full_build.sh
+```
+
 ## Process model
 
 - `fork()` clones the current process and its user address space (full page copy, no COW yet).

@@ -1,9 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ISO_PATH="${1:?missing iso path}"
-ISO_ROOT="${2:?missing iso root path}"
-INITRD_PATH="${3:?missing initrd path}"
-KERNEL_PATH="${4:?missing kernel path}"
+
+usage() {
+  cat <<'USAGE'
+usage:
+  tools/verify_iso.sh [ISO_PATH ISO_ROOT INITRD_PATH KERNEL_PATH]
+
+If no arguments are provided, defaults are used:
+  build/poos.iso build/iso-root build/initrd.tar build/kernel.bin
+USAGE
+}
+
+if [[ $# -eq 0 ]]; then
+  ISO_PATH="build/poos.iso"
+  ISO_ROOT="build/iso-root"
+  INITRD_PATH="build/initrd.tar"
+  KERNEL_PATH="build/kernel.bin"
+elif [[ $# -eq 4 ]]; then
+  ISO_PATH="$1"
+  ISO_ROOT="$2"
+  INITRD_PATH="$3"
+  KERNEL_PATH="$4"
+else
+  usage
+  exit 2
+fi
 
 for path in "$ISO_PATH" "$ISO_ROOT" "$INITRD_PATH" "$KERNEL_PATH"; do
   [[ -e "$path" ]] || { echo "error: missing required artifact: $path"; exit 1; }
