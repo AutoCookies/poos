@@ -12,6 +12,7 @@
 #include "../sec/audit.h"
 #include "../sec/auth.h"
 #include "../vfs/vfs_perm.h"
+#include "../crypto/rng.h"
 
 void vga_write(const char*);
 
@@ -152,3 +153,7 @@ int sys_chroot(const char* upath){ char p[128]; if(copy_user_path(p,upath,sizeof
 int sys_capget(void){ struct cred* c=cred_current(); return c?(int)c->cap_effective:-1; }
 int sys_capset(int pid,u32 caps){ return proc_capset((u32)pid,caps); }
 int sys_auth(const char* uuser,const char* upass,u32* uuid,u32* ugid){ char user[32],pass[64]; u32 uid=0,gid=0; if(copy_user_path(user,uuser,sizeof(user))<0) return -1; if(copy_user_path(pass,upass,sizeof(pass))<0) return -1; if(auth_verify_password(user,pass)<0) return -1; if(auth_lookup_user(user,&uid,&gid)<0) return -1; if(uuid && copy_to_user(uuid,&uid,sizeof(uid))<0) return -1; if(ugid && copy_to_user(ugid,&gid,sizeof(gid))<0) return -1; audit_log("login ok"); return 0; }
+
+int sys_getrandom(void* ubuf, u32 len, u32 flags){ (void)flags; if(len>256) len=256; u8 kbuf[256]; if(rng_get_bytes(kbuf,len)<0) return -1; if(copy_to_user(ubuf,kbuf,len)<0) return -1; return (int)len; }
+int sys_time(void){ return (int)time_epoch(); }
+int sys_settime(u32 epoch){ struct cred* c=cred_current(); if(!c||!cred_has_cap(c,CAP_SYS_ADMIN)) return -1; time_set_epoch(epoch); return 0; }

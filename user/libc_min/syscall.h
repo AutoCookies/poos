@@ -7,7 +7,8 @@ enum {
     SYS_EXECVE, SYS_WAITPID, SYS_SPAWN, SYS_FORK, SYS_PIPE, SYS_DUP2, SYS_KILL, SYS_MMAP, SYS_MUNMAP,
     SYS_MKDIR, SYS_UNLINK, SYS_RENAME, SYS_SYNC,
     SYS_SOCKET, SYS_BIND, SYS_CONNECT, SYS_SEND, SYS_RECV, SYS_SENDTO, SYS_RECVFROM, SYS_SOCKCLOSE, SYS_NETCTL,
-    SYS_GETUID, SYS_SETUID, SYS_GETEUID, SYS_CHMOD, SYS_CHOWN, SYS_UMASK, SYS_CHROOT, SYS_CAPGET, SYS_CAPSET, SYS_AUTH
+    SYS_GETUID, SYS_SETUID, SYS_GETEUID, SYS_CHMOD, SYS_CHOWN, SYS_UMASK, SYS_CHROOT, SYS_CAPGET, SYS_CAPSET, SYS_AUTH,
+    SYS_GETRANDOM, SYS_TIME, SYS_SETTIME
 };
 
 struct vstat { unsigned int mode, size, type, uid, gid; };
@@ -46,5 +47,9 @@ int sys_auth(const char* user,const char* pass,int* uid,int* gid);
 #define AF_INET 2
 #define SOCK_STREAM 1
 #define SOCK_DGRAM 2
+
+int sys_getrandom(void* buf, int len, int flags);
+int sys_time(void);
+int sys_settime(int epoch);
 
 #endif

@@ -27,6 +27,7 @@
 #include "fs/fat/fat.h"
 #include "pci/pci.h"
 #include "net/net.h"
+#include "crypto/rng.h"
 
 void vga_init(void);
 void vga_write(const char* s);
@@ -65,6 +66,8 @@ void kernel_main(struct BootInfo* bootinfo) {
     heap_smoke_test();
 
     time_init();
+    rng_init();
+    rng_mix_entropy(bootinfo, sizeof(*bootinfo));
     sched_init();
     page_init();
     mm_init();
