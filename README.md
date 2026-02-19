@@ -201,3 +201,37 @@ Supported minimal socket APIs:
 1. Run `udprecv` inside PoOS.
 2. On host: `echo -n hi | nc -u 127.0.0.1 5555`
 3. Use `udpsend` in PoOS to send to gateway on port 5555.
+
+## PoOS v1.0 TCP stack
+
+PoOS now includes a modular TCP stack under `kernel/net/tcp/` split by state machine, input, output, timers, retransmit, window control, connection table, and socket integration.
+
+### TCP state machine
+
+Implemented states: `CLOSED`, `LISTEN`, `SYN_SENT`, `SYN_RECEIVED`, `ESTABLISHED`, `FIN_WAIT_1`, `FIN_WAIT_2`, `CLOSE_WAIT`, `LAST_ACK`, `TIME_WAIT`.
+
+### Connection lifecycle
+
+- Active opens allocate a `tcp_conn` keyed by 4-tuple.
+- 3-way handshake is validated (`SYN`, `SYN+ACK`, `ACK`) before entering `ESTABLISHED`.
+- Ordered receive buffering tracks `rcv_nxt` and only delivers contiguous payload.
+- FIN close transitions through active/passive close states with `TIME_WAIT` timer handling.
+
+### Socket semantics
+
+- Added `SOCK_STREAM` with `socket/connect/send/recv/close` support.
+- `connect()` waits for handshake completion.
+- `recv()` sleeps until bytes available or EOF.
+- `send()` respects remote advertised window and segments by MSS.
+
+### Current limitations
+
+- No congestion control yet (window-based flow control only).
+- No TLS.
+- Server-side `LISTEN` path is reserved for future release.
+
+### Performance notes
+
+- Retransmit queue supports exponential RTO backoff.
+- Net timers run from network-thread context (no IRQ blocking).
+- TCP and UDP/ICMP share IPv4 demux safely.

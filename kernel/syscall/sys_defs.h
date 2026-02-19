@@ -30,10 +30,13 @@ enum {
     SYS_SYNC = 24,
     SYS_SOCKET = 25,
     SYS_BIND = 26,
-    SYS_SENDTO = 27,
-    SYS_RECVFROM = 28,
-    SYS_SOCKCLOSE = 29,
-    SYS_NETCTL = 30,
+    SYS_CONNECT = 27,
+    SYS_SEND = 28,
+    SYS_RECV = 29,
+    SYS_SENDTO = 30,
+    SYS_RECVFROM = 31,
+    SYS_SOCKCLOSE = 32,
+    SYS_NETCTL = 33,
 };
 
 #endif
