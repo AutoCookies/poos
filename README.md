@@ -128,3 +128,30 @@ Current limitations:
 - MAP_SHARED is minimally recognized; writeback is not implemented.
 - Eviction policy is simple and skips referenced cache entries.
 - ELF demand-loading is left for follow-up (Phase 7.5).
+
+## PoOS v0.8 Disk-backed storage (experimental)
+
+- Added block device core (`kernel/blk`) and ATA PIO IDE primary driver (`kernel/drivers/ata_pio.c`).
+- Added MBR partition scanning that registers `hd0p1` slices.
+- Added 4KiB buffer cache with LRU-ish eviction and writeback (`kernel/bcache`).
+- Added FAT16 filesystem implementation (`kernel/fs/fat`) mounted at `/home` when `hd0p1` exists.
+- VFS gained writable operations (`create`, `mkdir`, `unlink`, `truncate`) and `sync` syscall path.
+- New user tools: `mkdir`, `rm`, `mv`, `cp`, `sync`.
+- Build now generates a second IDE disk image (`build/poos_disk.img`) with MBR + FAT16 using `tools/mkfatdisk.py`.
+
+### Run
+
+```sh
+make run
+```
+
+QEMU launches with:
+- `build/poos.img` as boot disk
+- `build/poos_disk.img` as secondary IDE disk for `/home`
+
+### Current FAT limitations
+
+- 8.3 filenames only.
+- Directory semantics are minimal.
+- Rename is currently stubbed.
+- No journal; use `sync` before shutdown.

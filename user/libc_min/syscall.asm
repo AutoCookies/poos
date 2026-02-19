@@ -99,3 +99,20 @@ sys_munmap: mov eax,20
             mov ecx,[esp+8]
             int 0x80
             ret
+global sys_mkdir, sys_unlink, sys_rename, sys_sync
+sys_mkdir: mov eax,21
+           mov ebx,[esp+4]
+           int 0x80
+           ret
+sys_unlink: mov eax,22
+            mov ebx,[esp+4]
+            int 0x80
+            ret
+sys_rename: mov eax,23
+            mov ebx,[esp+4]
+            mov ecx,[esp+8]
+            int 0x80
+            ret
+sys_sync: mov eax,24
+          int 0x80
+          ret

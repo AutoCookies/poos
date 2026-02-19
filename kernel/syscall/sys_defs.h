@@ -24,6 +24,10 @@ enum {
     SYS_KILL = 18,
     SYS_MMAP = 19,
     SYS_MUNMAP = 20,
+    SYS_MKDIR = 21,
+    SYS_UNLINK = 22,
+    SYS_RENAME = 23,
+    SYS_SYNC = 24,
 };
 
 #endif
