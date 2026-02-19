@@ -85,3 +85,46 @@ Legacy v0.5 syscalls remain available (`open/read/write/execve/waitpid/spawn/...
 - No termios, canonical/raw mode control.
 - Pipe blocking currently scheduler-sleep based (simple, not full wait queues).
 - No advanced shell parser (single pipeline segment, simple redirections).
+
+## PoOS v0.7 Virtual Memory
+
+PoOS v0.7 introduces an address-space centric VM layer:
+
+- `struct addrspace` owns per-process `cr3` + sorted VMA list.
+- `mmap/munmap` create and remove VMAs without eager allocation.
+- Anonymous and file-backed mappings are demand-paged in page fault path.
+- `fork()` uses Copy-on-Write by marking user PTEs readonly + `PTE_COW` (x86 available bit 9).
+- COW write faults allocate private pages only when needed.
+- File mappings use a minimal global page cache keyed by `(vnode*, file_page_index)`.
+
+### Demand paging flow
+
+1. CPU raises page fault.
+2. Fault handler checks process VMA for fault address.
+3. If unmapped or permission-violating: SIGSEGV.
+4. If not-present + anon VMA: allocate zeroed page.
+5. If not-present + file VMA: pull page from page cache (load from vnode on miss).
+6. If present+write+COW: perform COW break (copy if shared, relabel writable if exclusive).
+7. Install PTE, `invlpg`, resume execution.
+
+### VM diagnostics
+
+Kernel vmstat counters include:
+- faults total/handled/sigsegv
+- COW faults/copies
+- anon pages allocated
+- file pages loaded
+- pagecache hit/miss/entries
+
+### Userland tests
+
+Run from shell:
+
+- `/bin/cowtest` (fork + COW isolation)
+- `/bin/mmaptest` (anon mmap + lazy touch)
+- `/bin/filemaptest` (file-backed mmap + cache reuse)
+
+Current limitations:
+- MAP_SHARED is minimally recognized; writeback is not implemented.
+- Eviction policy is simple and skips referenced cache entries.
+- ELF demand-loading is left for follow-up (Phase 7.5).

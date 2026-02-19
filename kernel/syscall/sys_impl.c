@@ -6,6 +6,7 @@
 #include "../time/time.h"
 #include "../vfs/vfs.h"
 #include "../ipc/pipe.h"
+#include "../mm/mmap.h"
 
 void vga_write(const char*);
 
@@ -120,3 +121,6 @@ int sys_pipe(int* ufds) {
 }
 int sys_dup2(int oldfd, int newfd) { struct task* t=task_current(); if(!t||!t->owner) return -1; return fdtable_dup2(&t->owner->fdt, oldfd, newfd); }
 int sys_kill(int pid, int sig) { return proc_send_signal((u32)pid, sig); }
+
+int sys_mmap(void* addr, u32 len, int prot, int flags, int fd, u32 off) { return mm_mmap_sys(addr, len, prot, flags, fd, off); }
+int sys_munmap(void* addr, u32 len) { return mm_munmap_sys(addr, len); }

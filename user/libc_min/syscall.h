@@ -4,7 +4,7 @@
 enum {
     SYS_WRITE = 1, SYS_EXIT, SYS_YIELD, SYS_SLEEP, SYS_GETPID,
     SYS_OPEN, SYS_CLOSE, SYS_READ, SYS_LSEEK, SYS_STAT, SYS_GETDENTS,
-    SYS_EXECVE, SYS_WAITPID, SYS_SPAWN, SYS_FORK, SYS_PIPE, SYS_DUP2, SYS_KILL
+    SYS_EXECVE, SYS_WAITPID, SYS_SPAWN, SYS_FORK, SYS_PIPE, SYS_DUP2, SYS_KILL, SYS_MMAP, SYS_MUNMAP
 };
 
 struct vstat { unsigned int mode, size, type; };
@@ -33,6 +33,8 @@ int sys_fork(void);
 int sys_pipe(int fds[2]);
 int sys_dup2(int oldfd,int newfd);
 int sys_kill(int pid,int sig);
+int sys_mmap(void* addr, int len, int prot, int flags, int fd, int off);
+int sys_munmap(void* addr, int len);
 
 #define O_RDONLY 0
 #define O_WRONLY 1
@@ -41,3 +43,11 @@ int sys_kill(int pid,int sig);
 #define O_TRUNC 0x200
 
 #endif
+
+#define PROT_READ 0x1
+#define PROT_WRITE 0x2
+#define PROT_EXEC 0x4
+#define MAP_PRIVATE 0x01
+#define MAP_SHARED 0x02
+#define MAP_FIXED 0x10
+#define MAP_ANON 0x20

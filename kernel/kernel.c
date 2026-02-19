@@ -18,6 +18,8 @@
 #include "fs/devfs.h"
 #include "fs/memfs.h"
 #include "tty/tty.h"
+#include "mm/mm.h"
+#include "mm/page.h"
 
 void vga_init(void);
 void vga_write(const char* s);
@@ -38,7 +40,7 @@ void kernel_main(struct BootInfo* bootinfo) {
     irq_disable();
 
     vga_init();
-    vga_write("PoOS v0.5 booting...\n");
+    vga_write("PoOS v0.7 booting...\n");
 
     gdt_init();
     irq_init();
@@ -54,6 +56,8 @@ void kernel_main(struct BootInfo* bootinfo) {
 
     time_init();
     sched_init();
+    page_init();
+    mm_init();
     proc_init();
     syscall_init();
     pit_init();

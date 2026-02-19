@@ -1,6 +1,7 @@
 #include "../proc/signal.h"
 #include "../arch/x86/idt.h"
 #include "sys_defs.h"
+#include "../mm/mmap.h"
 
 int sys_write(int fd, const void* buf, u32 len);
 int sys_exit(int code);
@@ -20,6 +21,8 @@ int sys_fork(struct trapframe* tf);
 int sys_pipe(int* ufds);
 int sys_dup2(int oldfd, int newfd);
 int sys_kill(int pid, int sig);
+int sys_mmap(void* addr, u32 len, int prot, int flags, int fd, u32 off);
+int sys_munmap(void* addr, u32 len);
 
 void syscall_dispatch(struct trapframe* tf) {
     int ret = -38;
@@ -42,6 +45,8 @@ void syscall_dispatch(struct trapframe* tf) {
         case SYS_PIPE: ret = sys_pipe((int*)tf->ebx); break;
         case SYS_DUP2: ret = sys_dup2((int)tf->ebx, (int)tf->ecx); break;
         case SYS_KILL: ret = sys_kill((int)tf->ebx, (int)tf->ecx); break;
+        case SYS_MMAP: ret = sys_mmap((void*)tf->ebx, tf->ecx, (int)tf->edx, (int)tf->esi, (int)tf->edi, tf->ebp); break;
+        case SYS_MUNMAP: ret = sys_munmap((void*)tf->ebx, tf->ecx); break;
         default: break;
     }
     tf->eax = (u32)ret;

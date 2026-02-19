@@ -2,6 +2,9 @@
 #include "../mem/pmm.h"
 #include "../mem/vmm.h"
 #include "../mem/mem.h"
+#include "../mm/vma.h"
+#include "../mm/addrspace.h"
+#include "../mem/heap.h"
 
 typedef struct { u8 e_ident[16]; u16 e_type; u16 e_machine; u32 e_version; u32 e_entry; u32 e_phoff; u32 e_shoff; u32 e_flags; u16 e_ehsize; u16 e_phentsize; u16 e_phnum; u16 e_shentsize; u16 e_shnum; u16 e_shstrndx; } Elf32_Ehdr;
 typedef struct { u32 p_type,p_offset,p_vaddr,p_paddr,p_filesz,p_memsz,p_flags,p_align; } Elf32_Phdr;
@@ -27,6 +30,9 @@ int elf32_load_image(struct proc* p, const u8* image, u32 size, u32* out_entry) 
             mem_set((void*)va, 0, 4096U);
         }
         mem_copy((void*)ph->p_vaddr, image + ph->p_offset, ph->p_filesz);
+        struct vma* v=(struct vma*)kmalloc(sizeof(*v),8);
+        if(v){ v->start=start; v->end=end; v->prot=VMA_PROT_READ | ((ph->p_flags & 2U)?VMA_PROT_WRITE:0U) | ((ph->p_flags & 1U)?VMA_PROT_EXEC:0U);
+            v->flags=VMA_MAP_PRIVATE|VMA_MAP_ANON; v->file=0; v->file_off=0; v->next=0; vma_insert(p->as,v);} 
     }
 
     *out_entry = eh->e_entry;
