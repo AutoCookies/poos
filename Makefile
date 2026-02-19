@@ -32,9 +32,11 @@ INITRD_TAR := $(BUILD_DIR)/initrd.tar
 
 INITRD_LBA := 300
 
-USER_APPS := init sh ls cat hello sleep fault cowtest mmaptest filemaptest mkdir rm mv cp sync ifconfig ping udpsend udprecv dnslookup httpget httpsget tlsprobe tcptest schedtest iotest nettest mmtest cpustat ps iostat locks login su id chmod chown umask passwd poosrun netnsctl memstat
+USER_APPS := init sh ls cat hello sleep fault cowtest mmaptest filemaptest mkdir rm mv cp sync ifconfig ping udpsend udprecv dnslookup httpget httpsget tlsprobe tcptest schedtest iotest nettest mmtest cpustat ps iostat locks login su id chmod chown umask passwd poosrun netnsctl memstat proxyd
 USER_ELFS := $(patsubst %,$(BUILD_DIR)/user/%.elf,$(USER_APPS))
 USER_COMMON_OBJS := $(BUILD_DIR)/user/crt0.o $(BUILD_DIR)/user/libc_min/syscall.o $(BUILD_DIR)/user/libc_min/printf_min.o $(BUILD_DIR)/user/libc_min/string.o
+PROXYD_SRCS := proxyd proxy_conn proxy_http1 proxy_tls proxy_cache_mem proxy_cache_disk proxy_eviction proxy_limits proxy_stats proxy_log
+PROXYD_OBJS := $(patsubst %,$(BUILD_DIR)/user/apps/proxyd/%.o,$(PROXYD_SRCS))
 
 KERNEL_C_SRCS := \
 	kernel/kernel.c kernel/gdt.c kernel/arch/x86/gdt.c kernel/arch/x86/tss.c kernel/arch/x86/idt.c \
@@ -129,6 +131,7 @@ $(INITRD_TAR): $(USER_ELFS) user/pack/mkinitrd.sh
 	cp $(BUILD_DIR)/user/passwd.elf user/pack/rootfs/bin/passwd
 	cp $(BUILD_DIR)/user/poosrun.elf user/pack/rootfs/bin/poosrun
 	cp $(BUILD_DIR)/user/netnsctl.elf user/pack/rootfs/bin/netnsctl
+	cp $(BUILD_DIR)/user/proxyd.elf user/pack/rootfs/bin/proxyd
 	user/pack/mkinitrd.sh user/pack/rootfs $(INITRD_TAR)
 
 $(BOOT_BIN): boot/boot.asm boot/gdt.asm
@@ -165,8 +168,15 @@ $(BUILD_DIR)/user/apps/%.o: user/apps/%.c
 	mkdir -p $(dir $@)
 	$(CC) $(U_CFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/user/apps/proxyd/%.o: user/apps/proxyd/%.c
+	mkdir -p $(dir $@)
+	$(CC) $(U_CFLAGS) -c $< -o $@
+
 $(BUILD_DIR)/user/%.elf: $(USER_COMMON_OBJS) $(BUILD_DIR)/user/apps/%.o user/user.ld
 	$(LD) -T user/user.ld -nostdlib -m elf_i386 -o $@ $(USER_COMMON_OBJS) $(BUILD_DIR)/user/apps/$*.o
+
+$(BUILD_DIR)/user/proxyd.elf: $(USER_COMMON_OBJS) $(PROXYD_OBJS) user/user.ld
+	$(LD) -T user/user.ld -nostdlib -m elf_i386 -o $@ $(USER_COMMON_OBJS) $(PROXYD_OBJS)
 
 run: $(IMAGE) $(DATA_IMAGE)
 	$(QEMU) -drive format=raw,file=$(IMAGE),if=ide,index=0 -drive format=raw,file=$(DATA_IMAGE),if=ide,index=1 -netdev user,id=n1,hostfwd=udp::5555-:5555 -device rtl8139,netdev=n1
