@@ -1,5 +1,7 @@
 #include "types.h"
 
+#define DEBUGCON_PORT 0xE9
+
 static volatile u16* const vga_buffer = (volatile u16*)VGA_TEXT_BUFFER;
 static const u8 VGA_WIDTH = 80;
 static const u8 VGA_HEIGHT = 25;
@@ -43,7 +45,13 @@ void vga_set_color(u8 fg_bg) {
     color = fg_bg;
 }
 
+static void debugcon_putc(char c) {
+    outb(DEBUGCON_PORT, (u8)c);
+}
+
 void vga_putc(char c) {
+    debugcon_putc(c);
+
     if (c == '\n') {
         col = 0;
         ++row;
