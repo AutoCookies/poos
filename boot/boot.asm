@@ -28,8 +28,6 @@ start:
     mov sp, REALMODE_STACK
 
     mov [boot_drive], dl
-    mov al, 'A'
-    call dbg_putc
 
     call build_bootinfo
     call enable_a20

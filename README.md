@@ -34,14 +34,13 @@ make run-headless-once
 `run-headless` is expected to keep the terminal attached and print debug output; it does **not** open a QEMU window.
 
 Boot-stage debug markers written by the bootloader to debugcon are:
-- `A` start in real mode
 - `P` entered protected mode
 - `K/k` before/after kernel read
 - `I/i` before/after initrd read
 - `J` jumping to kernel entry
 - `!` entered bootloader hang loop
 
-If `run-headless-once` prints an empty debugcon log, check `build/qemu_run.log` first; that captures QEMU startup/runtime errors (e.g. missing acceleration/device issues) that would otherwise look like a silent hang.
+If `run-headless-once` prints an empty debugcon log, check `build/qemu_run.log` first; that captures QEMU startup/runtime errors (e.g. missing acceleration/device issues). `build/qemu_serial.log` is also captured for completeness.
 
 Equivalent manual command:
 
