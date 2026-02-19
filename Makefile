@@ -87,7 +87,7 @@ KERNEL_C_SRCS := \
 KERNEL_ASM_SRCS := kernel/entry.asm kernel/arch/x86/isr_stubs.asm kernel/arch/x86/ring3.asm kernel/arch/x86/syscall_stub.asm kernel/sched/context_switch.asm kernel/arch/x86/smp/start_ap.asm
 KERNEL_OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(KERNEL_C_SRCS)) $(patsubst %.asm,$(BUILD_DIR)/%.o,$(KERNEL_ASM_SRCS))
 
-.PHONY: all clean kernel user rootfs initrd iso verify-iso run test-full-build toolchain-check
+.PHONY: all clean kernel user rootfs initrd iso verify-iso run run-headless test-full-build toolchain-check
 all: iso
 
 toolchain-check:
@@ -148,6 +148,9 @@ verify-iso:
 
 run: iso
 	$(QEMU) -drive format=raw,file=$(ISO),if=ide,index=0 -drive format=raw,file=$(DATA_IMAGE),if=ide,index=1 -netdev user,id=n1,hostfwd=udp::5555-:5555 -device rtl8139,netdev=n1
+
+run-headless: iso
+	$(QEMU) -m 80M -smp 1 -no-reboot -no-shutdown -display none -serial none -debugcon stdio -global isa-debugcon.iobase=0xe9 -drive format=raw,file=$(ISO),if=ide,index=0 -drive format=raw,file=$(DATA_IMAGE),if=ide,index=1 -netdev user,id=n1,hostfwd=udp::5555-:5555 -device rtl8139,netdev=n1
 
 test-full-build:
 	@tools/test_full_build.sh

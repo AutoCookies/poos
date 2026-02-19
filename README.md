@@ -15,6 +15,27 @@ This produces:
 - `build/initrd.tar`
 - `build/iso-root/`
 
+Important:
+- `build/poos.iso` is a **raw boot disk image** (renamed `.iso` for artifact convenience), not an ISO9660 filesystem image.
+- Boot it with `-drive format=raw,file=...`, **not** `-cdrom`.
+
+Boot in QEMU (recommended):
+
+```sh
+make run
+# or headless debug output:
+make run-headless
+```
+
+Equivalent manual command:
+
+```sh
+qemu-system-i386   -m 80M -smp 1   -drive format=raw,file=build/poos.iso,if=ide,index=0   -drive format=raw,file=build/poos_disk.img,if=ide,index=1   -netdev user,id=n1,hostfwd=udp::5555-:5555   -device rtl8139,netdev=n1
+```
+
+VirtualBox note:
+- Error `VERR_VMX_IN_VMX_ROOT_MODE` means host nested virtualization/VT-x is unavailable or blocked, so the VM cannot start. This is a host hypervisor setting issue, not a PoOS image format issue.
+
 Validate artifacts:
 
 ```sh
