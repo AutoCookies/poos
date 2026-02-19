@@ -100,7 +100,7 @@ sys_munmap: mov eax,20
             int 0x80
             ret
 global sys_mkdir, sys_unlink, sys_rename, sys_sync
-global sys_socket, sys_bind, sys_sendto, sys_recvfrom, sys_sockclose, sys_netctl
+global sys_socket, sys_bind, sys_connect, sys_send, sys_recv, sys_sendto, sys_recvfrom, sys_sockclose, sys_netctl
 sys_mkdir: mov eax,21
            mov ebx,[esp+4]
            int 0x80
@@ -130,7 +130,27 @@ sys_bind: mov eax,26
           mov edx,[esp+12]
           int 0x80
           ret
-sys_sendto: mov eax,27
+sys_connect: mov eax,27
+             mov ebx,[esp+4]
+             mov ecx,[esp+8]
+             mov edx,[esp+12]
+             int 0x80
+             ret
+sys_send: mov eax,28
+          mov ebx,[esp+4]
+          mov ecx,[esp+8]
+          mov edx,[esp+12]
+          mov esi,[esp+16]
+          int 0x80
+          ret
+sys_recv: mov eax,29
+          mov ebx,[esp+4]
+          mov ecx,[esp+8]
+          mov edx,[esp+12]
+          mov esi,[esp+16]
+          int 0x80
+          ret
+sys_sendto: mov eax,30
             mov ebx,[esp+4]
             mov ecx,[esp+8]
             mov edx,[esp+12]
@@ -139,7 +159,7 @@ sys_sendto: mov eax,27
             mov ebp,[esp+24]
             int 0x80
             ret
-sys_recvfrom: mov eax,28
+sys_recvfrom: mov eax,31
               mov ebx,[esp+4]
               mov ecx,[esp+8]
               mov edx,[esp+12]
@@ -148,11 +168,11 @@ sys_recvfrom: mov eax,28
               mov ebp,[esp+24]
               int 0x80
               ret
-sys_sockclose: mov eax,29
+sys_sockclose: mov eax,32
                mov ebx,[esp+4]
                int 0x80
                ret
-sys_netctl: mov eax,30
+sys_netctl: mov eax,33
             mov ebx,[esp+4]
             mov ecx,[esp+8]
             mov edx,[esp+12]
