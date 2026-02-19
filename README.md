@@ -336,3 +336,24 @@ PoOS v1.2 adds a credential-based security layer:
 ### Adding users (v1)
 
 Edit `/etc/passwd`, `/etc/group`, and `/etc/shadow` inside initrd rootfs and rebuild image with `make build`.
+
+## PoOS v1.3 TLS groundwork (in-progress)
+
+- Added kernel crypto module layout under `kernel/crypto/` with hardened primitives currently used by RNG (`memwipe`, constant-time compare, SHA-256, HMAC, HKDF).
+- Added kernel CSPRNG plumbing and `getrandom(2)` syscall (`SYS_GETRANDOM`).
+- Added wall-clock epoch syscalls (`time(2)` and `settime(2)`) for certificate-validity checks.
+- Added TLS/X.509 module scaffolding under `kernel/net/tls/` and `kernel/crypto/x509/` for phased integration.
+- Added userland commands:
+  - `/bin/httpsget`
+  - `/bin/tlsprobe`
+
+### Trust store and TLS notes
+
+- Planned trust store path: `/etc/ssl/certs/ca-bundle.der` (or PEM bundle in same directory).
+- TLS hostname verification and chain validation are planned to run in strict mode by default.
+- Time must be set correctly before TLS validation; use `settime` syscall from privileged tooling.
+
+### Current limitations
+
+- TLS 1.2 handshake and HTTPS data path are not fully enabled in this snapshot.
+- TLS 1.3, OCSP, and CRL checks are not yet implemented.

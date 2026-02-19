@@ -19,7 +19,7 @@ INITRD_TAR := $(BUILD_DIR)/initrd.tar
 
 INITRD_LBA := 300
 
-USER_APPS := init sh ls cat hello sleep fault cowtest mmaptest filemaptest mkdir rm mv cp sync ifconfig ping udpsend udprecv dnslookup httpget tcptest schedtest iotest nettest mmtest cpustat ps iostat locks login su id chmod chown umask passwd
+USER_APPS := init sh ls cat hello sleep fault cowtest mmaptest filemaptest mkdir rm mv cp sync ifconfig ping udpsend udprecv dnslookup httpget httpsget tlsprobe tcptest schedtest iotest nettest mmtest cpustat ps iostat locks login su id chmod chown umask passwd
 USER_ELFS := $(patsubst %,$(BUILD_DIR)/user/%.elf,$(USER_APPS))
 USER_COMMON_OBJS := $(BUILD_DIR)/user/crt0.o $(BUILD_DIR)/user/libc_min/syscall.o $(BUILD_DIR)/user/libc_min/printf_min.o $(BUILD_DIR)/user/libc_min/string.o
 
@@ -47,7 +47,8 @@ KERNEL_C_SRCS := \
 	kernel/ipc/ringbuf.c kernel/ipc/pipe.c kernel/tty/tty.c kernel/tty/kbd.c kernel/tty/console.c \
 	kernel/proc/signal.c kernel/proc/proc_table.c kernel/proc/fork.c kernel/proc/thread_user.c kernel/proc/mm_clone.c \
 	kernel/mm/addrspace.c kernel/mm/vma.c kernel/mm/page.c kernel/mm/cow.c kernel/mm/mmap.c kernel/mm/faults_vm.c kernel/mm/pagecache.c kernel/mm/anon.c kernel/mm/filemap.c kernel/mm/tlb.c kernel/mm/mm_debug.c \
-	kernel/pci/pci.c kernel/net/net.c kernel/net/net_timer.c kernel/net/net_stats.c kernel/net/netif.c kernel/net/pbuf.c kernel/net/checksum.c kernel/net/eth.c kernel/net/arp.c kernel/net/ipv4.c kernel/net/icmp.c kernel/net/udp.c kernel/net/dhcp.c kernel/net/dns.c kernel/net/route.c kernel/net/sock.c kernel/net/sock_api.c kernel/net/net_debug.c kernel/net/tcp/tcp.c kernel/net/tcp/tcp_state.c kernel/net/tcp/tcp_input.c kernel/net/tcp/tcp_output.c kernel/net/tcp/tcp_timer.c kernel/net/tcp/tcp_retransmit.c kernel/net/tcp/tcp_window.c kernel/net/tcp/tcp_conn.c kernel/net/tcp/tcp_sock.c kernel/net/tcp/tcp_debug.c kernel/drivers/rtl8139.c kernel/drivers/virtio_net.c kernel/dev/devnet.c
+	kernel/pci/pci.c kernel/net/net.c kernel/net/net_timer.c kernel/net/net_stats.c kernel/net/netif.c kernel/net/pbuf.c kernel/net/checksum.c kernel/net/eth.c kernel/net/arp.c kernel/net/ipv4.c kernel/net/icmp.c kernel/net/udp.c kernel/net/dhcp.c kernel/net/dns.c kernel/net/route.c kernel/net/sock.c kernel/net/sock_api.c kernel/net/net_debug.c kernel/net/tcp/tcp.c kernel/net/tcp/tcp_state.c kernel/net/tcp/tcp_input.c kernel/net/tcp/tcp_output.c kernel/net/tcp/tcp_timer.c kernel/net/tcp/tcp_retransmit.c kernel/net/tcp/tcp_window.c kernel/net/tcp/tcp_conn.c kernel/net/tcp/tcp_sock.c kernel/net/tcp/tcp_debug.c kernel/drivers/rtl8139.c kernel/drivers/virtio_net.c kernel/dev/devnet.c \
+	kernel/crypto/memwipe.c kernel/crypto/constant_time.c kernel/crypto/rng.c kernel/crypto/sha256.c kernel/crypto/hmac.c kernel/crypto/hkdf.c
 
 KERNEL_ASM_SRCS := kernel/entry.asm kernel/arch/x86/isr_stubs.asm kernel/arch/x86/ring3.asm kernel/arch/x86/syscall_stub.asm kernel/sched/context_switch.asm kernel/arch/x86/smp/start_ap.asm
 
@@ -86,6 +87,8 @@ $(INITRD_TAR): $(USER_ELFS) user/pack/mkinitrd.sh
 	cp $(BUILD_DIR)/user/udprecv.elf user/pack/rootfs/bin/udprecv
 	cp $(BUILD_DIR)/user/dnslookup.elf user/pack/rootfs/bin/dnslookup
 	cp $(BUILD_DIR)/user/httpget.elf user/pack/rootfs/bin/httpget
+	cp $(BUILD_DIR)/user/httpsget.elf user/pack/rootfs/bin/httpsget
+	cp $(BUILD_DIR)/user/tlsprobe.elf user/pack/rootfs/bin/tlsprobe
 	cp $(BUILD_DIR)/user/tcptest.elf user/pack/rootfs/bin/tcptest
 	cp $(BUILD_DIR)/user/schedtest.elf user/pack/rootfs/bin/schedtest
 	cp $(BUILD_DIR)/user/iotest.elf user/pack/rootfs/bin/iotest

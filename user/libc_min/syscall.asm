@@ -223,3 +223,17 @@ sys_auth: mov eax,43
           mov esi,[esp+16]
           int 0x80
           ret
+global sys_getrandom, sys_time, sys_settime
+sys_getrandom: mov eax,44
+               mov ebx,[esp+4]
+               mov ecx,[esp+8]
+               mov edx,[esp+12]
+               int 0x80
+               ret
+sys_time: mov eax,45
+          int 0x80
+          ret
+sys_settime: mov eax,46
+             mov ebx,[esp+4]
+             int 0x80
+             ret

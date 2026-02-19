@@ -40,6 +40,9 @@ int sys_getuid(void); int sys_setuid(int uid); int sys_geteuid(void);
 int sys_chmod(const char* path,u32 mode); int sys_chown(const char* path,u32 uid,u32 gid);
 int sys_umask(u32 mask); int sys_chroot(const char* path); int sys_capget(void); int sys_capset(int pid,u32 caps);
 int sys_auth(const char* user,const char* pass,u32* uid,u32* gid);
+int sys_getrandom(void* buf,u32 len,u32 flags);
+int sys_time(void);
+int sys_settime(u32 epoch);
 
 void syscall_dispatch(struct trapframe* tf) {
     int ret = -38;
@@ -87,6 +90,9 @@ void syscall_dispatch(struct trapframe* tf) {
         case SYS_CAPGET: ret = sys_capget(); break;
         case SYS_CAPSET: ret = sys_capset((int)tf->ebx,tf->ecx); break;
         case SYS_AUTH: ret = sys_auth((const char*)tf->ebx,(const char*)tf->ecx,(u32*)tf->edx,(u32*)tf->esi); break;
+        case SYS_GETRANDOM: ret = sys_getrandom((void*)tf->ebx,tf->ecx,tf->edx); break;
+        case SYS_TIME: ret = sys_time(); break;
+        case SYS_SETTIME: ret = sys_settime(tf->ebx); break;
         default: break;
     }
     tf->eax = (u32)ret;

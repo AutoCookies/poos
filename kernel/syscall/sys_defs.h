@@ -47,6 +47,9 @@ enum {
     SYS_CAPGET = 41,
     SYS_CAPSET = 42,
     SYS_AUTH = 43,
+    SYS_GETRANDOM = 44,
+    SYS_TIME = 45,
+    SYS_SETTIME = 46,
 };
 
 #endif
