@@ -424,3 +424,60 @@ PoOS v1.5 extends the v1.4 namespace substrate with an integrated container netw
 
 - Packet data path remains single-NIC in this snapshot; veth/bridge/NAT are represented in per-namespace control-plane state and hardened syscall plumbing.
 - NAT/port-forward counters are maintained for observability and future packet-path wiring.
+
+## PoOS Edge80 profile (Ultra-Lean server mode)
+
+PoOS now ships build profiles to support memory-bounded edge deployments.
+
+### Build profiles
+
+- `CONFIG_EDGE_80MB`: enabled by default via `PROFILE=edge80`; tuned for bounded memory use.
+- `CONFIG_LEAN_SERVER`: enabled for `PROFILE=edge80` and `PROFILE=lean`.
+- `CONFIG_FULL`: enabled for `PROFILE=full`.
+
+Build commands:
+
+- `make edge80`
+- `make PROFILE=lean build`
+- `make PROFILE=full build`
+
+Recommended QEMU invocation for edge mode:
+
+- `qemu-system-i386 -m 80M -smp 1 -drive format=raw,file=build/poos.img,if=ide,index=0 -drive format=raw,file=build/poos_disk.img,if=ide,index=1 -netdev user,id=n1,hostfwd=tcp::8443-:8443 -device rtl8139,netdev=n1`
+
+### Memory budget table (single source of truth)
+
+Budget definitions are centralized in `kernel/mm/budget.h` + `kernel/mm/budget.c`.
+
+Default `CONFIG_EDGE_80MB` caps:
+
+- Kernel core + stacks: 10 MiB
+- Slab allocator total: 10 MiB
+- Page cache: 8 MiB
+- Buffer cache: 8 MiB
+- Networking buffers: 6 MiB
+- TCP memory: 8 MiB
+- TLS memory: 6 MiB
+- User RSS aggregate: 20 MiB
+
+Total target: 76 MiB + 4 MiB safety margin.
+
+### Enforced bounded behavior in this snapshot
+
+- pbuf allocations are served from fixed pools (`256B` and `1536B` classes) with drop-on-exhaust behavior.
+- Buffer cache memory is hard-accounted into the global budget at init.
+- Allocation refusals and packet drops are tracked via fixed counters.
+- `memstat` user tool fetches kernel budget snapshots via `SYS_MEMSTAT`.
+
+### Observability
+
+Run:
+
+- `/bin/memstat` for budget caps/used/peak/refused and pressure counters.
+- `/bin/iostat` for storage counters.
+- `/bin/ifconfig` for network state.
+
+### Current edge-mode limitations
+
+- TLS transport stack remains scaffolded in this tree and is not production-enabled yet.
+- Throughput is intentionally constrained by fixed buffer pools and conservative memory caps.

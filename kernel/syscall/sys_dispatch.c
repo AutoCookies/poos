@@ -49,6 +49,7 @@ int sys_clone(u32 flags, struct trapframe* tf);
 int sys_unshare(u32 flags);
 int sys_seccomp(u32 mode);
 int sys_cgset(u32 mem,u32 pids,u32 cpu);
+int sys_memstat(void* out, u32 len);
 
 void syscall_dispatch(struct trapframe* tf) {
     int ret = -38;
@@ -108,6 +109,7 @@ void syscall_dispatch(struct trapframe* tf) {
         case SYS_UNSHARE: ret = sys_unshare(tf->ebx); break;
         case SYS_SECCOMP: ret = sys_seccomp(tf->ebx); break;
         case SYS_CGSET: ret = sys_cgset(tf->ebx, tf->ecx, tf->edx); break;
+        case SYS_MEMSTAT: ret = sys_memstat((void*)tf->ebx, tf->ecx); break;
         default: break;
     }
     tf->eax = (u32)ret;

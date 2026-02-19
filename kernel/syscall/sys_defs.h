@@ -54,6 +54,7 @@ enum {
     SYS_UNSHARE = 48,
     SYS_SECCOMP = 49,
     SYS_CGSET = 50,
+    SYS_MEMSTAT = 51,
 };
 
 #endif

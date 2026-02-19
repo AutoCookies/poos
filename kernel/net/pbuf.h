@@ -8,6 +8,8 @@ typedef struct pbuf {
     u16 capacity;
     u16 headroom;
     u16 refcnt;
+    u8 pool_kind;
+    u16 pool_idx;
     struct pbuf* next;
 } pbuf_t;
 
