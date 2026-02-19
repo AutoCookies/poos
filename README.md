@@ -35,8 +35,6 @@ make run-headless-once
 
 Boot-stage debug markers written by the bootloader to debugcon are:
 - `P` entered protected mode
-- `I` before initrd read
-- `J` jumping to kernel entry
 - `!` entered bootloader hang loop
 
 If `run-headless-once` prints an empty debugcon log, check `build/qemu_run.log` first; that captures QEMU startup/runtime errors (e.g. missing acceleration/device issues). `build/qemu_serial.log` is also captured for completeness.

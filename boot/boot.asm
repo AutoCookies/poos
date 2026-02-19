@@ -96,8 +96,6 @@ protected_mode_entry:
     mov edi, KERNEL_LOAD_ADDR
     call ata_lba_read
 
-    mov al, 'I'
-    call dbg_putc
     mov dl, [boot_drive]
     mov eax, INITRD_LBA_START
     mov ecx, INITRD_SECTORS
@@ -105,8 +103,6 @@ protected_mode_entry:
     call ata_lba_read
 
     mov eax, BOOTINFO_ADDR
-    mov al, 'J'
-    call dbg_putc
     jmp 0x08:KERNEL_LOAD_ADDR
 
 hang:
@@ -153,6 +149,10 @@ ata_lba_read:
 
     mov dx, 0x1F6
     mov al, 0xE0
+    test byte [boot_drive], 1
+    jz .drive_ok
+    or al, 0x10
+.drive_ok:
     and bh, 0x0F
     or al, bh
     out dx, al
@@ -212,10 +212,12 @@ ata_wait_drq:
     in al, dx
     test al, 0x80
     jnz .wait2
+    test al, 0x08
+    jnz .ready
     test al, 0x01
     jnz hang
-    test al, 0x08
-    jz .wait2
+    jmp .wait2
+.ready:
     ret
 
 dbg_putc:
