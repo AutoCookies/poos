@@ -235,3 +235,66 @@ Implemented states: `CLOSED`, `LISTEN`, `SYN_SENT`, `SYN_RECEIVED`, `ESTABLISHED
 - Retransmit queue supports exponential RTO backoff.
 - Net timers run from network-thread context (no IRQ blocking).
 - TCP and UDP/ICMP share IPv4 demux safely.
+
+## PoOS v1.1 SMP foundations
+
+PoOS v1.1 introduces a dedicated SMP subsystem with explicit per-CPU data paths and split modules for APIC/IPI/scheduler locks.
+
+### Boot flow (BSP + AP startup)
+
+- BSP performs normal early init (paging/heap/interrupts), then calls `smp_init()`.
+- `smp_init()` initializes CPU descriptors, LAPIC/IOAPIC entry points, and CPU discovery (ACPI MADT first, MP table fallback).
+- `smp_boot_aps()` performs INIT/SIPI sequencing via APIC helpers and marks secondary CPUs online.
+- AP trampoline entry is provided at `kernel/arch/x86/smp/start_ap.asm` and reserved for low-memory SIPI vector handoff.
+
+### Per-CPU layout
+
+Per-CPU metadata lives in `kernel/arch/x86/smp/cpu.c` and tracks:
+- cpu/apic id
+- online state
+- tick counters
+- current task pointer
+- interrupt nesting depth
+- preemption disable depth
+
+The per-CPU API is exposed by:
+- `cpu_id()`
+- `this_cpu_ptr(var)`
+- `per_cpu(var, cpu)`
+
+### Scheduler model
+
+- SMP scheduler code is split under `kernel/sched/smp/`.
+- Local enqueue/dequeue fast path is isolated in `sched_smp_*` APIs.
+- Preemption counters are per CPU (`preempt_disable()/preempt_enable()`).
+- Load-balance hook is kept in `load_balance.c` for deterministic steal policy growth.
+
+### TLB shootdown + IPIs
+
+- IPI surface includes reschedule and TLB shootdown messages (`ipi_send_resched`, `ipi_send_tlb_shootdown`).
+- Shootdown handler hooks are split into `kernel/arch/x86/smp/ipi.c` and can be wired to address-space CPU masks in VM code.
+
+### Locking primitives and rules
+
+PoOS v1.1 adds central lock primitives under `kernel/locks/`:
+- spinlock (`spin_lock`, `spin_lock_irqsave`)
+- mutex (sleep/yield based)
+- rwlock (reader/writer serialization)
+
+Debug/telemetry stubs for contention are exposed in `lock_debug.c`.
+
+### Time and IRQ SMP split
+
+- `kernel/time/time_smp.c` tracks per-CPU ticks.
+- `kernel/time/clocksource.c` provides a monotonic ns view from ticks.
+- Generic IRQ affinity plumbing lives in `kernel/irq/irq*.c`.
+
+### Running with multiple CPUs
+
+Run QEMU with SMP enabled, for example:
+
+```sh
+qemu-system-i386 -smp 4 \
+  -drive format=raw,file=build/poos.img,if=ide,index=0 \
+  -drive format=raw,file=build/poos_disk.img,if=ide,index=1
+```
