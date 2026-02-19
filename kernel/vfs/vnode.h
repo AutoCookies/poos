@@ -5,10 +5,24 @@
 
 enum vnode_type { VNODE_REG = 1, VNODE_DIR = 2, VNODE_DEV = 3 };
 
+#define VFS_MODE_IRUSR 0400U
+#define VFS_MODE_IWUSR 0200U
+#define VFS_MODE_IXUSR 0100U
+#define VFS_MODE_IRGRP 0040U
+#define VFS_MODE_IWGRP 0020U
+#define VFS_MODE_IXGRP 0010U
+#define VFS_MODE_IROTH 0004U
+#define VFS_MODE_IWOTH 0002U
+#define VFS_MODE_IXOTH 0001U
+#define VFS_MODE_SUID  04000U
+#define VFS_MODE_SGID  02000U
+
 struct vstat {
     u32 mode;
     u32 size;
     u32 type;
+    u32 uid;
+    u32 gid;
 };
 
 struct vdirent {
@@ -35,6 +49,9 @@ struct vnode_ops {
 struct vnode {
     u32 refs;
     enum vnode_type type;
+    u32 uid;
+    u32 gid;
+    u32 mode;
     const struct vnode_ops* ops;
     void* data;
 };

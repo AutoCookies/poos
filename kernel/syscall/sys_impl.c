@@ -7,6 +7,11 @@
 #include "../vfs/vfs.h"
 #include "../ipc/pipe.h"
 #include "../mm/mmap.h"
+#include "../sec/cred.h"
+#include "../sec/caps.h"
+#include "../sec/audit.h"
+#include "../sec/auth.h"
+#include "../vfs/vfs_perm.h"
 
 void vga_write(const char*);
 
@@ -120,7 +125,7 @@ int sys_pipe(int* ufds) {
     return copy_to_user(ufds, fds, sizeof(fds));
 }
 int sys_dup2(int oldfd, int newfd) { struct task* t=task_current(); if(!t||!t->owner) return -1; return fdtable_dup2(&t->owner->fdt, oldfd, newfd); }
-int sys_kill(int pid, int sig) { return proc_send_signal((u32)pid, sig); }
+int sys_kill(int pid, int sig) { struct cred* c=cred_current(); struct proc* p=proc_find((u32)pid); if(!p||!c) return -1; if(c->uid!=p->cred->uid && !cred_has_cap(c,CAP_KILL)) return -1; return proc_send_signal((u32)pid, sig); }
 
 int sys_mmap(void* addr, u32 len, int prot, int flags, int fd, u32 off) { return mm_mmap_sys(addr, len, prot, flags, fd, off); }
 int sys_munmap(void* addr, u32 len) { return mm_munmap_sys(addr, len); }
@@ -135,4 +140,15 @@ int sys_sync(void){ return vfs_sync(); }
 #include "../net/dns.h"
 
 struct netinfo_u {u8 mac[6];u32 ip,mask,gw,dns;u32 rx,tx,drops;};
-int sys_netctl(int cmd, void* ubuf, u32 len){ netif_t* n=netif_default(); if(!n) return -1; if(cmd==1){ if(len<sizeof(struct netinfo_u)) return -1; struct netinfo_u i; for(int k=0;k<6;k++) i.mac[k]=n->mac[k]; i.ip=n->ip; i.mask=n->netmask; i.gw=n->gw; i.dns=n->dns; i.rx=n->stats.rx_packets; i.tx=n->stats.tx_packets; i.drops=n->stats.rx_drops+n->stats.tx_drops; return copy_to_user(ubuf,&i,sizeof(i)); } if(cmd==2){ if(len<4) return -1; u32 ip; if(copy_from_user(&ip,ubuf,4)<0) return -1; return icmp_ping(ip,0x55AA,1,1000); } if(cmd==3){ char host[64]; if(len>=sizeof(host)) len=sizeof(host)-1; if(copy_from_user(host,ubuf,len)<0) return -1; host[len]=0; u32 ip=0; if(dns_lookup_a(host,&ip)<0) return -1; return copy_to_user(ubuf,&ip,4); } return -1; }
+int sys_netctl(int cmd, void* ubuf, u32 len){ netif_t* n=netif_default(); if(!n) return -1; if(cmd==1){ if(len<sizeof(struct netinfo_u)) return -1; struct netinfo_u i; for(int k=0;k<6;k++) i.mac[k]=n->mac[k]; i.ip=n->ip; i.mask=n->netmask; i.gw=n->gw; i.dns=n->dns; i.rx=n->stats.rx_packets; i.tx=n->stats.tx_packets; i.drops=n->stats.rx_drops+n->stats.tx_drops; return copy_to_user(ubuf,&i,sizeof(i)); } if(cmd==2){ struct cred* c=cred_current(); if(!c||!cred_has_cap(c,CAP_NET_RAW)) return -1; if(len<4) return -1; u32 ip; if(copy_from_user(&ip,ubuf,4)<0) return -1; return icmp_ping(ip,0x55AA,1,1000); } if(cmd==3){ char host[64]; if(len>=sizeof(host)) len=sizeof(host)-1; if(copy_from_user(host,ubuf,len)<0) return -1; host[len]=0; u32 ip=0; if(dns_lookup_a(host,&ip)<0) return -1; return copy_to_user(ubuf,&ip,4); } return -1; }
+
+int sys_getuid(void){ struct cred* c=cred_current(); return c?(int)c->uid:-1; }
+int sys_geteuid(void){ struct cred* c=cred_current(); return c?(int)c->euid:-1; }
+int sys_setuid(int uid){ return proc_setuid((u32)uid); }
+int sys_umask(u32 mask){ struct cred* c=cred_current(); if(!c) return -1; u32 old=c->umask; c->umask=mask & 0777U; return (int)old; }
+int sys_chmod(const char* upath,u32 mode){ char p[128]; struct vnode* vn=0; struct cred* c=cred_current(); if(copy_user_path(p,upath,sizeof(p))<0) return -1; if(vfs_resolve(p,&vn)<0) return -1; if(!c || (c->euid!=0 && c->euid!=vn->uid)){ vnode_put(vn); audit_log("deny chmod"); return -1; } vn->mode = (vn->mode & ~07777U) | (mode & 07777U); vnode_put(vn); audit_log("chmod"); return 0; }
+int sys_chown(const char* upath,u32 uid,u32 gid){ char p[128]; struct vnode* vn=0; struct cred* c=cred_current(); if(copy_user_path(p,upath,sizeof(p))<0) return -1; if(vfs_resolve(p,&vn)<0) return -1; if(!c || (!cred_has_cap(c,CAP_CHOWN) && c->euid!=0)){ vnode_put(vn); audit_log("deny chown"); return -1; } vn->uid=uid; vn->gid=gid; vnode_put(vn); audit_log("chown"); return 0; }
+int sys_chroot(const char* upath){ char p[128]; if(copy_user_path(p,upath,sizeof(p))<0) return -1; return proc_chroot(p); }
+int sys_capget(void){ struct cred* c=cred_current(); return c?(int)c->cap_effective:-1; }
+int sys_capset(int pid,u32 caps){ return proc_capset((u32)pid,caps); }
+int sys_auth(const char* uuser,const char* upass,u32* uuid,u32* ugid){ char user[32],pass[64]; u32 uid=0,gid=0; if(copy_user_path(user,uuser,sizeof(user))<0) return -1; if(copy_user_path(pass,upass,sizeof(pass))<0) return -1; if(auth_verify_password(user,pass)<0) return -1; if(auth_lookup_user(user,&uid,&gid)<0) return -1; if(uuid && copy_to_user(uuid,&uid,sizeof(uid))<0) return -1; if(ugid && copy_to_user(ugid,&gid,sizeof(gid))<0) return -1; audit_log("login ok"); return 0; }

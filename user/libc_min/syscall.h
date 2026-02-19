@@ -6,10 +6,11 @@ enum {
     SYS_OPEN, SYS_CLOSE, SYS_READ, SYS_LSEEK, SYS_STAT, SYS_GETDENTS,
     SYS_EXECVE, SYS_WAITPID, SYS_SPAWN, SYS_FORK, SYS_PIPE, SYS_DUP2, SYS_KILL, SYS_MMAP, SYS_MUNMAP,
     SYS_MKDIR, SYS_UNLINK, SYS_RENAME, SYS_SYNC,
-    SYS_SOCKET, SYS_BIND, SYS_CONNECT, SYS_SEND, SYS_RECV, SYS_SENDTO, SYS_RECVFROM, SYS_SOCKCLOSE, SYS_NETCTL
+    SYS_SOCKET, SYS_BIND, SYS_CONNECT, SYS_SEND, SYS_RECV, SYS_SENDTO, SYS_RECVFROM, SYS_SOCKCLOSE, SYS_NETCTL,
+    SYS_GETUID, SYS_SETUID, SYS_GETEUID, SYS_CHMOD, SYS_CHOWN, SYS_UMASK, SYS_CHROOT, SYS_CAPGET, SYS_CAPSET, SYS_AUTH
 };
 
-struct vstat { unsigned int mode, size, type; };
+struct vstat { unsigned int mode, size, type, uid, gid; };
 struct vdirent { unsigned int ino, type; char name[32]; };
 struct sockaddr_in_k { unsigned short family, port; unsigned int addr; };
 struct netinfo_u { unsigned char mac[6]; unsigned int ip,mask,gw,dns,rx,tx,drops; };
@@ -31,6 +32,11 @@ int sys_sendto(int fd,const void* buf,int len,int flags,const struct sockaddr_in
 int sys_recvfrom(int fd,void* buf,int len,int flags,struct sockaddr_in_k* sa,int* alen);
 int sys_sockclose(int fd);
 int sys_netctl(int cmd, void* buf, int len);
+int sys_getuid(void); int sys_geteuid(void); int sys_setuid(int uid);
+int sys_chmod(const char* path,int mode); int sys_chown(const char* path,int uid,int gid);
+int sys_umask(int mask); int sys_chroot(const char* path);
+int sys_capget(void); int sys_capset(int pid,int caps);
+int sys_auth(const char* user,const char* pass,int* uid,int* gid);
 
 #define O_RDONLY 0
 #define O_WRONLY 1

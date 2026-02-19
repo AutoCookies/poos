@@ -25,7 +25,7 @@ static int devfs_write(struct vnode* vn, u32 off, const void* buf, u32 len) {
     }
     return -1;
 }
-static int devfs_getattr(struct vnode* vn, struct vstat* out) { out->type = vn->type; out->mode = 0; out->size = 0; return 0; }
+static int devfs_getattr(struct vnode* vn, struct vstat* out) { out->type = vn->type; out->mode = vn->mode; out->uid=vn->uid; out->gid=vn->gid; out->size = 0; return 0; }
 
 static struct devfs_node g_console = { "console", VNODE_DEV };
 static struct devfs_node g_tty = { "tty", VNODE_DEV };

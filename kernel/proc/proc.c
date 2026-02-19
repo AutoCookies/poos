@@ -14,6 +14,10 @@
 #include "../mm/vma.h"
 #include "../mm/cow.h"
 #include "../mm/page.h"
+#include "../sec/cred.h"
+#include "../vfs/mount.h"
+#include "../vfs/vnode.h"
+#include "../sec/cred.h"
 
 u32 pid_alloc(void);
 int proc_setup_user_stack(struct proc* p, u32* out_esp);
@@ -67,6 +71,10 @@ struct proc* proc_create(const char* name, struct proc* parent) {
     addrspace_init(p->as, p->cr3);
     fdtable_init(&p->fdt);
     proc_setup_stdio(p);
+    if (parent && parent->cred) p->cred = cred_clone(parent->cred);
+    else p->cred = cred_alloc_root();
+    p->root_vnode = parent ? parent->root_vnode : mount_root();
+    if (p->root_vnode) vnode_ref(p->root_vnode);
     p->next = g_procs; g_procs = p;
     return p;
 }

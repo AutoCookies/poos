@@ -19,7 +19,7 @@ INITRD_TAR := $(BUILD_DIR)/initrd.tar
 
 INITRD_LBA := 300
 
-USER_APPS := init sh ls cat hello sleep fault cowtest mmaptest filemaptest mkdir rm mv cp sync ifconfig ping udpsend udprecv dnslookup httpget tcptest schedtest iotest nettest mmtest cpustat ps iostat locks
+USER_APPS := init sh ls cat hello sleep fault cowtest mmaptest filemaptest mkdir rm mv cp sync ifconfig ping udpsend udprecv dnslookup httpget tcptest schedtest iotest nettest mmtest cpustat ps iostat locks login su id chmod chown umask passwd
 USER_ELFS := $(patsubst %,$(BUILD_DIR)/user/%.elf,$(USER_APPS))
 USER_COMMON_OBJS := $(BUILD_DIR)/user/crt0.o $(BUILD_DIR)/user/libc_min/syscall.o $(BUILD_DIR)/user/libc_min/printf_min.o $(BUILD_DIR)/user/libc_min/string.o
 
@@ -31,6 +31,9 @@ KERNEL_C_SRCS := \
 	kernel/mem/heap.c kernel/mem/mem_debug.c kernel/proc/proc.c kernel/proc/task.c kernel/proc/pid.c kernel/proc/elf32.c \
 	kernel/proc/usercopy.c kernel/proc/ustack.c kernel/proc/exec.c kernel/proc/wait.c kernel/proc/reaper.c \
 	kernel/syscall/syscall.c kernel/syscall/sys_dispatch.c kernel/syscall/sys_impl.c \
+	kernel/sec/cred.c kernel/sec/auth.c kernel/sec/caps.c kernel/sec/audit.c kernel/sec/sec_debug.c \
+	kernel/proc/proc_cred.c kernel/proc/exec_secure.c kernel/proc/ns.c kernel/proc/session.c \
+	kernel/vfs/vfs_perm.c \
 	kernel/vfs/vnode.c kernel/vfs/vfs.c kernel/vfs/path.c kernel/vfs/file.c kernel/vfs/fdtable.c kernel/vfs/mount.c kernel/vfs/vfs_debug.c \
 	kernel/fs/initrd.c kernel/fs/tarfs.c kernel/fs/devfs.c kernel/fs/memfs.c \
 	kernel/blk/blkdev.c kernel/blk/bio.c kernel/blk/part.c kernel/blk/blk_debug.c \
@@ -92,6 +95,13 @@ $(INITRD_TAR): $(USER_ELFS) user/pack/mkinitrd.sh
 	cp $(BUILD_DIR)/user/ps.elf user/pack/rootfs/bin/ps
 	cp $(BUILD_DIR)/user/iostat.elf user/pack/rootfs/bin/iostat
 	cp $(BUILD_DIR)/user/locks.elf user/pack/rootfs/bin/locks
+	cp $(BUILD_DIR)/user/login.elf user/pack/rootfs/bin/login
+	cp $(BUILD_DIR)/user/su.elf user/pack/rootfs/bin/su
+	cp $(BUILD_DIR)/user/id.elf user/pack/rootfs/bin/id
+	cp $(BUILD_DIR)/user/chmod.elf user/pack/rootfs/bin/chmod
+	cp $(BUILD_DIR)/user/chown.elf user/pack/rootfs/bin/chown
+	cp $(BUILD_DIR)/user/umask.elf user/pack/rootfs/bin/umask
+	cp $(BUILD_DIR)/user/passwd.elf user/pack/rootfs/bin/passwd
 	user/pack/mkinitrd.sh user/pack/rootfs $(INITRD_TAR)
 
 $(BOOT_BIN): boot/boot.asm boot/gdt.asm
