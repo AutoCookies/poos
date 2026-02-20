@@ -1,5 +1,6 @@
 #include "../libc_min/syscall.h"
-#include "../libc_min/printf_min.h"
+
+extern int printf_min(const char* fmt, ...);
 
 static int streq(const char*a,const char*b){int i=0; for(;a[i]&&b[i];++i) if(a[i]!=b[i]) return 0; return a[i]==b[i];}
 static int parse_num(const char*s){ int v=0; for(int i=0;s[i];i++){ if(s[i]<'0'||s[i]>'9') break; v=v*10+(s[i]-'0'); } return v; }

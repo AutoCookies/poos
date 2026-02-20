@@ -66,6 +66,23 @@ int sys_auth(const char* user,const char* pass,int* uid,int* gid);
 #define SOCK_STREAM 1
 #define SOCK_DGRAM 2
 
+#define PROT_READ  0x1
+#define PROT_WRITE 0x2
+#define PROT_EXEC  0x4
+
+#define MAP_PRIVATE 0x01
+#define MAP_SHARED  0x02
+#define MAP_FIXED   0x10
+#define MAP_ANON    0x20
+
+#define CLONE_NEWNS (1u<<0)
+#define CLONE_NEWPID (1u<<1)
+#define CLONE_NEWNET (1u<<2)
+#define CLONE_NEWUTS (1u<<3)
+#define CLONE_NEWUSER (1u<<4)
+#define SECCOMP_MODE_DISABLED 0
+#define SECCOMP_MODE_STRICT 1
+
 int sys_getrandom(void* buf, int len, int flags);
 int sys_time(void);
 int sys_settime(int epoch);
@@ -75,11 +92,3 @@ int sys_meminfo(struct meminfo_u* out, int len);
 int sys_sysctl(int op, int key, unsigned int* value);
 
 #endif
-
-#define CLONE_NEWNS (1u<<0)
-#define CLONE_NEWPID (1u<<1)
-#define CLONE_NEWNET (1u<<2)
-#define CLONE_NEWUTS (1u<<3)
-#define CLONE_NEWUSER (1u<<4)
-#define SECCOMP_MODE_DISABLED 0
-#define SECCOMP_MODE_STRICT 1

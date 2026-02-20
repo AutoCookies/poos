@@ -5,10 +5,17 @@ org 0x7C00
 %define REALMODE_STACK   0x7C00
 %define PMODE_STACK      0x0009FC00
 %define KERNEL_LBA_START 1
+%ifndef KERNEL_SECTORS
 %define KERNEL_SECTORS   256
+%endif
 %define INITRD_LOAD_ADDR 0x00180000
 %define INITRD_LBA_START 300
+%ifndef INITRD_SECTORS
 %define INITRD_SECTORS   512
+%endif
+%ifndef INITRD_BYTES
+%define INITRD_BYTES     (INITRD_SECTORS * 512)
+%endif
 %define BOOTINFO_ADDR    0x9000
 %define E820_ENTRIES_MAX 128
 
@@ -41,7 +48,7 @@ build_bootinfo:
     mov dword [di + 16], KERNEL_LOAD_ADDR
     mov dword [di + 20], 0
     mov dword [di + 24], INITRD_LOAD_ADDR
-    mov dword [di + 28], (INITRD_SECTORS * 512)
+    mov dword [di + 28], INITRD_BYTES
 
     mov di, BOOTINFO_ADDR + 32
     xor ebx, ebx
@@ -73,6 +80,8 @@ build_bootinfo:
 
 [bits 32]
 protected_mode_entry:
+    mov al, 'P'
+    call dbg_putc
     mov ax, 0x10
     mov ds, ax
     mov es, ax
@@ -97,6 +106,8 @@ protected_mode_entry:
     jmp 0x08:KERNEL_LOAD_ADDR
 
 hang:
+    mov al, '!'
+    call dbg_putc
     cli
     hlt
     jmp hang
@@ -116,30 +127,36 @@ ata_lba_read:
 .next_sector:
     test ecx, ecx
     jz .done
-    call ata_wait_not_busy
+    call ata_wait_ready
 
     mov dx, 0x1F2
     mov al, 1
     out dx, al
 
-    mov edx, eax
+    mov ebx, eax
     mov dx, 0x1F3
-    mov al, dl
+    mov al, bl
     out dx, al
 
     mov dx, 0x1F4
-    mov al, dh
+    mov al, bh
     out dx, al
 
-    shr edx, 16
+    shr ebx, 16
     mov dx, 0x1F5
-    mov al, dl
+    mov al, bl
     out dx, al
 
     mov dx, 0x1F6
     mov al, 0xE0
-    or al, dh
+    test byte [boot_drive], 1
+    jz .drive_ok
+    or al, 0x10
+.drive_ok:
+    and bh, 0x0F
+    or al, bh
     out dx, al
+    call ata_io_delay
 
     mov dx, 0x1F7
     mov al, 0x20
@@ -163,6 +180,24 @@ ata_lba_read:
     popad
     ret
 
+ata_io_delay:
+    mov dx, 0x3F6
+    in al, dx
+    in al, dx
+    in al, dx
+    in al, dx
+    ret
+
+ata_wait_ready:
+    mov dx, 0x1F7
+.waitr:
+    in al, dx
+    test al, 0x80
+    jnz .waitr
+    test al, 0x40
+    jz .waitr
+    ret
+
 ata_wait_not_busy:
     mov dx, 0x1F7
 .wait1:
@@ -175,12 +210,19 @@ ata_wait_drq:
     mov dx, 0x1F7
 .wait2:
     in al, dx
+    test al, 0x80
+    jnz .wait2
     test al, 0x08
     jnz .ready
     test al, 0x01
     jnz hang
     jmp .wait2
 .ready:
+    ret
+
+dbg_putc:
+    mov dx, 0xE9
+    out dx, al
     ret
 
 %include "boot/gdt.asm"

@@ -2,6 +2,76 @@
 
 PoOS v0.6 adds Unix-like process control + IPC on top of the v0.5 VFS/initrd base: `fork`, `waitpid`, `pipe`, `dup2`, interactive TTY input, basic signal defaults, and writable `/tmp` via memfs.
 
+## Build ISO (quick start)
+
+```sh
+make clean
+make iso
+```
+
+This produces:
+- `build/poos.iso`
+- `build/kernel.bin`
+- `build/initrd.tar`
+- `build/iso-root/`
+
+Important:
+- `build/poos.iso` is a **raw boot disk image** (renamed `.iso` for artifact convenience), not an ISO9660 filesystem image.
+- Boot it with `-drive format=raw,file=...`, **not** `-cdrom`.
+
+Boot in QEMU (recommended):
+
+```sh
+make run
+# or headless debug output:
+make run-headless
+# logs to files (no GUI):
+make run-headless-log
+# auto-stop after ~12s and print logs:
+make run-headless-once
+```
+
+`run-headless` is expected to keep the terminal attached and print debug output; it does **not** open a QEMU window.
+
+Boot-stage debug markers written by the bootloader to debugcon are:
+- `P` entered protected mode
+- `!` entered bootloader hang loop
+
+If `run-headless-once` prints an empty debugcon log, check `build/qemu_run.log` first; that captures QEMU startup/runtime errors (e.g. missing acceleration/device issues). `build/qemu_serial.log` is also captured for completeness.
+
+Equivalent manual command:
+
+```sh
+qemu-system-i386   -m 80M -smp 1   -drive format=raw,file=build/poos.iso,if=ide,index=0   -drive format=raw,file=build/poos_disk.img,if=ide,index=1   -netdev user,id=n1,hostfwd=udp::5555-:5555   -device rtl8139,netdev=n1
+```
+
+VirtualBox note:
+- Error `VERR_VMX_IN_VMX_ROOT_MODE` means host nested virtualization/VT-x is unavailable or blocked, so the VM cannot start. This is a host hypervisor setting issue, not a PoOS image format issue.
+
+If QEMU remains at `Booting from Hard Disk...`:
+- run a fresh rebuild so boot sector metadata matches current artifact sizes:
+
+```sh
+make clean
+make iso
+```
+
+(bootloader sector counts are generated from current `kernel.bin` and `initrd.tar` at build time.)
+
+Validate artifacts:
+
+```sh
+make verify-iso
+# or directly:
+./tools/verify_iso.sh
+```
+
+Run the full build + verify + boot smoke test:
+
+```sh
+./tools/test_full_build.sh
+```
+
 ## Process model
 
 - `fork()` clones the current process and its user address space (full page copy, no COW yet).

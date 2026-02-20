@@ -4,6 +4,7 @@
 #include "../sec/caps.h"
 #include "../vfs/mount.h"
 #include "../vfs/vfs.h"
+#include "../vfs/path.h"
 #include "../vfs/vnode.h"
 #include "../sec/audit.h"
 #include "../ns/ns_proxy.h"

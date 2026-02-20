@@ -2,6 +2,7 @@
 #include "task.h"
 #include "elf32.h"
 #include "../vfs/vfs.h"
+#include "../vfs/path.h"
 #include "../mem/heap.h"
 #include "../sec/cred.h"
 #include "../sec/audit.h"
