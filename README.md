@@ -1,4 +1,19 @@
-# PoOS v0.6
+<div align="center">
+
+<img src="assets/logo.png" alt="PoOS Logo" width="520"/>
+
+# PoOS
+
+<p>
+  <a href="https://discord.gg/nnkfW83n">
+    <img src="https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"/>
+  </a>
+  <img src="https://img.shields.io/badge/Language-C%20%2F%20x86%20ASM-A97FDE?style=for-the-badge&logo=c&logoColor=white" alt="Language: C / x86 ASM"/>
+  <img src="https://img.shields.io/badge/Platform-x86%20Bare%20Metal-orange?style=for-the-badge&logo=linux&logoColor=white" alt="Platform: x86 Bare Metal"/>
+  <img src="https://img.shields.io/badge/License-Non--Commercial%20Copyleft-green?style=for-the-badge" alt="License: Non-Commercial Copyleft"/>
+</p>
+
+</div>
 
 PoOS v0.6 adds Unix-like process control + IPC on top of the v0.5 VFS/initrd base: `fork`, `waitpid`, `pipe`, `dup2`, interactive TTY input, basic signal defaults, and writable `/tmp` via memfs.
 
