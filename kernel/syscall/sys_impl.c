@@ -5,6 +5,7 @@
 #include "../sched/sched.h"
 #include "../time/time.h"
 #include "../vfs/vfs.h"
+#include "../vfs/path.h"
 #include "../ipc/pipe.h"
 #include "../mm/mmap.h"
 #include "../sec/cred.h"
@@ -184,13 +185,15 @@ int sys_netctl(int cmd, void* ubuf, u32 len){
     if(cmd==2){
         if(!netns_allowed()) return -1;
         struct cred* c=cred_current(); if(!c||!cred_has_cap(c,CAP_NET_RAW)) return -1;
-        if(len<4) return -1; u32 ip; if(copy_from_user(&ip,ubuf,4)<0) return -1;
+        if(len<4) return -1;
+        u32 ip; if(copy_from_user(&ip,ubuf,4)<0) return -1;
         return icmp_ping(ip,0x55AA,1,1000);
     }
     if(cmd==3){
         if(!netns_allowed()) return -1;
         char host[64]; if(len>=sizeof(host)) len=sizeof(host)-1;
-        if(copy_from_user(host,ubuf,len)<0) return -1; host[len]=0;
+        if(copy_from_user(host,ubuf,len)<0) return -1;
+        host[len]=0;
         u32 ip=0; if(dns_lookup_a(host,&ip)<0) return -1;
         return copy_to_user(ubuf,&ip,4);
     }

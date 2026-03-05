@@ -3,6 +3,7 @@
 
 #include "vnode.h"
 #include "file.h"
+#include "path.h"
 
 void vfs_init(void);
 int vfs_mount(const char* path, struct vnode* root);

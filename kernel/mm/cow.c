@@ -15,10 +15,10 @@ int cow_fork_clone(struct proc* child, struct proc* parent) {
     for (u32 pdei=0; pdei<768; ++pdei) {
         if (!(ppd[pdei] & PTE_PRESENT)) continue;
         struct page* cptp = page_alloc(0); if (!cptp) return -1;
-        mem_set((void*)(cptp->phys + KERNEL_BASE), 0, 4096);
+        mem_set((void*)(cptp->phys + KERNEL_VIRT_BASE), 0, 4096);
         cpd[pdei] = cptp->phys | PTE_PRESENT | PTE_USER | PTE_RW;
         u32* ppt = hw_pt_virt_from_pde(ppd[pdei]);
-        u32* cpt = (u32*)(cptp->phys + KERNEL_BASE);
+        u32* cpt = (u32*)(cptp->phys + KERNEL_VIRT_BASE);
         for (u32 ptei=0; ptei<1024; ++ptei) {
             u32 pte = ppt[ptei];
             if (!(pte & PTE_PRESENT) || !(pte & PTE_USER)) continue;
@@ -53,7 +53,7 @@ int cow_handle_write_fault(struct proc* p, u32 fault_addr) {
     }
     struct page* np = page_alloc(0);
     if (!np) return -1;
-    mem_copy((void*)(np->phys + KERNEL_BASE), (void*)(phys + KERNEL_BASE), 4096);
+    mem_copy((void*)(np->phys + KERNEL_VIRT_BASE), (void*)(phys + KERNEL_VIRT_BASE), 4096);
     pt[ptei] = (np->phys | pte_user_flags(pte) | PTE_RW) & ~PTE_COW;
     page_put(oldp);
     mm_counters()->cow_copies++;

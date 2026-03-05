@@ -49,7 +49,7 @@ int mm_handle_page_fault(struct trapframe* tf, u32 fault_addr) {
     if (!(pd[pdei] & PTE_PRESENT)) {
         struct page* ptp = page_alloc(0);
         if (!ptp) { page_put(pg); return -1; }
-        mem_set((void*)(ptp->phys + KERNEL_BASE),0,4096);
+        mem_set((void*)(ptp->phys + KERNEL_VIRT_BASE),0,4096);
         pd[pdei] = ptp->phys | PTE_PRESENT | PTE_USER | PTE_RW;
     }
     u32* pt = hw_pt_virt_from_pde(pd[pdei]);

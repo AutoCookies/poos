@@ -49,8 +49,16 @@ static int devdir_readdir(struct vnode* vn, u32* cookie, struct vdirent* out) {
     return 0;
 }
 
-static const struct vnode_ops g_devdir_ops = { devdir_lookup, 0, 0, devdir_readdir, devfs_getattr };
-static const struct vnode_ops g_devnode_ops = { 0, devfs_read, devfs_write, 0, devfs_getattr };
+static const struct vnode_ops g_devdir_ops = {
+    .lookup = devdir_lookup,
+    .readdir = devdir_readdir,
+    .getattr = devfs_getattr
+};
+static const struct vnode_ops g_devnode_ops = {
+    .read = devfs_read,
+    .write = devfs_write,
+    .getattr = devfs_getattr
+};
 
 struct vnode* devfs_root(void) {
     vnode_init(&g_root_vn, VNODE_DIR, &g_devdir_ops, &g_dev);

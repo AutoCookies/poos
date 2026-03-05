@@ -1,7 +1,7 @@
 ENTRY(_start)
 
 KERNEL_VIRT_BASE = 0xC0000000;
-KERNEL_PHYS_BASE = 0x00100000;
+KERNEL_PHYS_BASE = 0x00200000;
 
 SECTIONS
 {
@@ -12,6 +12,7 @@ SECTIONS
 
     .text : AT(ADDR(.text) - KERNEL_VIRT_BASE)
     {
+        *(.text.entry)
         *(.text*)
     }
 

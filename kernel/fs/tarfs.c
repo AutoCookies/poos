@@ -65,7 +65,13 @@ static int tar_read(struct vnode* vn, u32 off, void* buf, u32 len);
 static int tar_readdir(struct vnode* vn, u32* cookie, struct vdirent* out);
 static int tar_getattr(struct vnode* vn, struct vstat* out);
 
-static const struct vnode_ops g_tar_ops = { tar_lookup, tar_read, 0, tar_readdir, tar_getattr };
+static const struct vnode_ops g_tar_ops = {
+    .lookup = tar_lookup,
+    .read = tar_read,
+    .write = 0,
+    .readdir = tar_readdir,
+    .getattr = tar_getattr
+};
 
 static void bind_ops(struct vnode* vn) { vn->ops = &g_tar_ops; }
 
@@ -91,8 +97,12 @@ static int tar_readdir(struct vnode* vn, u32* cookie, struct vdirent* out) {
         const struct tar_header* h = hdr_at(d->mnt, off);
         if (name_is_empty(h->name)) break;
         char full[128]; u32 fi=0;
-        if (h->prefix[0]) { for (u32 i=0; h->prefix[i] && fi+1<sizeof(full); ++i) full[fi++]=h->prefix[i]; if (fi+1<sizeof(full)) full[fi++]='/'; }
-        for (u32 i=0; h->name[i] && fi+1<sizeof(full); ++i) full[fi++]=h->name[i]; full[fi]='\0';
+        if (h->prefix[0]) {
+            for (u32 i=0; h->prefix[i] && fi+1<sizeof(full); ++i) full[fi++]=h->prefix[i];
+            if (fi+1<sizeof(full)) full[fi++]='/';
+        }
+        for (u32 i=0; h->name[i] && fi+1<sizeof(full); ++i) full[fi++]=h->name[i];
+        full[fi]='\0';
         if (d->path[0] && !str_prefix(full, d->path)) { off = next_hdr_off(d->mnt, off); continue; }
         const char* rest = full + str_len(d->path);
         if (d->path[0] && rest[0]=='/') rest++;

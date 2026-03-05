@@ -90,6 +90,7 @@ int ata_pio_init(void);
 int rtl8139_init(void);
 
 void kernel_main(struct BootInfo* bootinfo) {
+    outb(0xE9, 'M');
     irq_disable();
 
     vga_init();
@@ -146,9 +147,9 @@ void kernel_main(struct BootInfo* bootinfo) {
     }
 
     if (ata_pio_init() == 0) {
-        struct blkdev* hd0 = blkdev_get("hd0");
-        if (hd0 && part_scan_mbr(hd0) == 0) {
-            struct blkdev* p1 = blkdev_get("hd0p1");
+        struct blkdev* hd1 = blkdev_get("hd1");
+        if (hd1 && part_scan_mbr(hd1) == 0) {
+            struct blkdev* p1 = blkdev_get("hd1p1");
             struct vnode* droot = 0;
             if (p1 && fat_mount(p1, &droot) == 0 && vfs_mount("/home", droot) == 0) {
                 vga_write("mounted /home from FAT disk\n");
@@ -156,7 +157,7 @@ void kernel_main(struct BootInfo* bootinfo) {
                 vga_write("disk: FAT mount failed\n");
             }
         } else {
-            vga_write("disk: no MBR partition\n");
+            vga_write("disk: no MBR partition on hd1\n");
         }
     } else {
         vga_write("disk: ata not found\n");

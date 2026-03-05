@@ -1,4 +1,5 @@
 #include "ns_proxy.h"
+#include "ns.h"
 #include "../mem/heap.h"
 #include "../vfs/mount.h"
 struct nsproxy* nsproxy_create_host(struct vnode* root){ struct nsproxy* n=(struct nsproxy*)kmalloc(sizeof(*n),8); if(!n) return 0; n->refcnt=1; n->mnt=mntns_create(root?root:mount_root()); n->pid=pidns_create(); n->net=netns_create(1); n->uts=utsns_create("poos"); n->user=userns_create(0,0,1); return n; }

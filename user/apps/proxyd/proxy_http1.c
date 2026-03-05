@@ -24,7 +24,8 @@ int proxy_fetch_once(unsigned int ip, unsigned short port, const char* host, con
     int he=find_hdr_end(out,n); if(he>0 && starts_with(out,"HTTP/1.1 200")){
         int i=0; while(i<he){
             if(i+24<he && starts_with(out+i,"Cache-Control: max-age=")){ int v=0; i+=23; while(i<he&&out[i]>='0'&&out[i]<='9'){ v=v*10+(out[i]-'0'); i++; } if(v>0){ *cacheable=1; *ttl=v; } }
-            while(i<he && !(out[i]=='\r'&&out[i+1]=='\n')) i++; i+=2;
+            while(i<he && !(out[i]=='\r'&&out[i+1]=='\n')) i++;
+            i+=2;
         }
     }
     return n;

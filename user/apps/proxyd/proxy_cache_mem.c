@@ -10,11 +10,28 @@ static unsigned char g_arena[PROXY_MEM_CACHE_CAP];
 static unsigned int g_cap = PROXY_MEM_CACHE_CAP, g_used, g_lru = 1;
 static struct proxy_cache_stats g_stats;
 
-static int arena_alloc(int n){ if(n<=0 || g_used + (unsigned int)n > g_cap) return -1; int off=(int)g_used; g_used += (unsigned int)n; return off; }
+static int arena_alloc(int n){
+    if(n<=0 || g_used + (unsigned int)n > g_cap) return -1;
+    int off=(int)g_used; g_used += (unsigned int)n; return off;
+}
 
-static int victim(void){ unsigned int best=0xffffffffu; int idx=-1; for(int i=0;i<PROXY_MEM_ENTRY_MAX;i++) if(g_mem[i].used && g_mem[i].lru<best){ best=g_mem[i].lru; idx=i; } return idx; }
+static int victim(void){
+    unsigned int best=0xffffffffu; int idx=-1;
+    for(int i=0;i<PROXY_MEM_ENTRY_MAX;i++) {
+        if(g_mem[i].used && g_mem[i].lru<best){ best=g_mem[i].lru; idx=i; }
+    }
+    return idx;
+}
 
-int proxy_cache_init(unsigned int mem_cap, unsigned int disk_cap, const char* dir){ (void)disk_cap; (void)dir; if(mem_cap>0 && mem_cap<=PROXY_MEM_CACHE_CAP) g_cap=mem_cap; proxy_memset(g_mem,0,sizeof(g_mem)); g_used=0; g_lru=1; proxy_memset(&g_stats,0,sizeof(g_stats)); g_stats.mem_cap=g_cap; g_stats.disk_cap=disk_cap; return 0; }
+int proxy_cache_init(unsigned int mem_cap, unsigned int disk_cap, const char* dir){
+    (void)disk_cap; (void)dir;
+    if(mem_cap>0 && mem_cap<=PROXY_MEM_CACHE_CAP) g_cap=mem_cap;
+    proxy_memset(g_mem,0,sizeof(g_mem));
+    g_used=0; g_lru=1;
+    proxy_memset(&g_stats,0,sizeof(g_stats));
+    g_stats.mem_cap=g_cap; g_stats.disk_cap=disk_cap;
+    return 0;
+}
 
 void proxy_cache_touch_miss(void){ g_stats.miss++; }
 
@@ -37,7 +54,8 @@ int proxy_cache_store_mem(const char* key, const char* hdr, int hdr_len, const u
     }
     int off=arena_alloc(body_len); if(off<0) return -1;
     struct proxy_cache_item* it=&g_mem[idx]; it->used=1; it->lru=g_lru++; it->key_hash=proxy_hash_key(key); it->key_len=(unsigned short)proxy_slen(key);
-    if(it->key_len>=PROXY_KEY_MAX) it->key_len=PROXY_KEY_MAX-1; proxy_memcpy(it->key,key,it->key_len); it->key[it->key_len]=0;
+    if(it->key_len>=PROXY_KEY_MAX) it->key_len=PROXY_KEY_MAX-1;
+    proxy_memcpy(it->key,key,it->key_len); it->key[it->key_len]=0;
     it->hdr_len=(unsigned short)hdr_len; proxy_memcpy(it->hdr,hdr,hdr_len); it->body=&g_arena[off]; it->body_len=(unsigned int)body_len; proxy_memcpy(it->body,body,body_len); it->expires=now+ttl;
     g_stats.mem_used=g_used; return 0;
 }
