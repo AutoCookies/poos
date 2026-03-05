@@ -10,7 +10,7 @@ static u32 g_tick, g_hits, g_misses;
 void pagecache_init(void) { mem_set(g_pc,0,sizeof(g_pc)); g_tick=g_hits=g_misses=0; }
 
 static void fill_page(struct vnode* vn, u32 idx, struct page* p) {
-    void* kva = (void*)(p->phys + KERNEL_BASE);
+    void* kva = (void*)(p->phys + KERNEL_VIRT_BASE);
     mem_set(kva,0,4096);
     if (vn && vn->ops && vn->ops->read) {
         int rd = vn->ops->read(vn, idx*4096U, kva, 4096);
@@ -46,6 +46,7 @@ struct page* pagecache_get(struct vnode* vn, u32 page_index, bool* hit) {
 
 void pagecache_put(struct page* p) { page_put(p); }
 void pagecache_stats(u32* hits,u32* misses,u32* entries) {
-    if(hits)*hits=g_hits; if(misses)*misses=g_misses;
+    if(hits)*hits=g_hits;
+    if(misses)*misses=g_misses;
     if(entries){u32 e=0;for(u32 i=0;i<PCACHE_MAX;++i) if(g_pc[i].page) ++e; *entries=e;}
 }

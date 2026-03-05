@@ -36,7 +36,9 @@ static int read_cluster_chain(struct fat_node* n,u32 off,void*buf,u32 len){ stru
 static int write_cluster_chain(struct fat_node* n,u32 off,const void*buf,u32 len){ struct fat_fs*fs=n->fs; const u8*i=buf; u32 done=0; while(done<len){ u32 pos=off+done; u32 cidx=pos/(fs->spc*512), in=pos%(fs->spc*512); if(n->first_cluster==0){ n->first_cluster=fat_alloc(fs); if(!n->first_cluster) return (int)done; }
         u32 cl=n->first_cluster; for(u32 k=0;k<cidx;k++){ u32 nx=fat_get(fs,cl); if(nx>=FAT_EOC){ nx=fat_alloc(fs); if(!nx) return (int)done; fat_set(fs,cl,nx); } cl=nx; }
         u32 sec=cl_to_lba(fs,cl)+in/512, so=in%512, ncpy=512-so; if(ncpy>len-done) ncpy=len-done; struct bcache_buf* b=bcache_get(fs->dev,(sec*512)/4096); if(!b) return (int)done; mem_copy(b->data+((sec*512)%4096)+so,i+done,ncpy); bcache_mark_dirty(b); bcache_put(b); done+=ncpy; }
-    if(off+done>n->size) n->size=off+done; return (int)done; }
+    if(off+done>n->size) n->size=off+done;
+    return (int)done;
+}
 
 static int fat_lookup(struct vnode* d,const char*name,struct vnode**out){ struct fat_node* dir=d->data; u32 i=0,lba,off; struct de e; while(1){ int rc=dir_iter(dir,&i,&e,&lba,&off); if(rc<=0) return -1; if(e.name[0]==0x00) return -1; if(e.name[0]==0xE5||e.attr==0x0F) continue; if(namecmp(e.name,name)){ struct fat_node* n=kmalloc(sizeof(*n),8); if(!n) return -1; n->fs=dir->fs; n->dir_cluster=dir->first_cluster; n->first_cluster=e.lo; n->size=e.size; n->attr=e.attr; vnode_init(&n->vn,(e.attr&FAT_ATTR_DIR)?VNODE_DIR:VNODE_REG,d->ops,n); *out=&n->vn; vnode_ref(*out); return 0; }} }
 static int fat_read(struct vnode* vn,u32 off,void*buf,u32 len){ return read_cluster_chain(vn->data,off,buf,len); }
@@ -51,7 +53,17 @@ static int fat_unlink(struct vnode* d,const char*name){ struct fat_node*dir=d->d
 static int fat_mkdir(struct vnode* d,const char*name,u32 mode,struct vnode**out){ (void)mode; struct vnode* vn=0; if(fat_create(d,name,0,&vn)<0) return -1; ((struct fat_node*)vn->data)->attr=FAT_ATTR_DIR; *out=vn; return 0; }
 static int fat_trunc(struct vnode* vn,u32 sz){ struct fat_node*n=vn->data; if(sz==0){ n->size=0; return 0; } return -1; }
 
-static const struct vnode_ops g_ops={fat_lookup,fat_read,fat_write,fat_readdir,fat_getattr,fat_create,fat_unlink,fat_mkdir,0,fat_trunc};
+static const struct vnode_ops g_ops = {
+    .lookup = fat_lookup,
+    .read = fat_read,
+    .write = fat_write,
+    .readdir = fat_readdir,
+    .getattr = fat_getattr,
+    .create = fat_create,
+    .mkdir = fat_mkdir,
+    .unlink = fat_unlink,
+    .truncate = fat_trunc
+};
 
 int fat_mount(struct blkdev* dev, struct vnode** out_root){
     struct bpb16 b; if(bio_read_bytes(dev,0,&b,sizeof(b))<0) return -1; if(b.bps!=512 || b.spc==0 || b.spf==0) return -1;

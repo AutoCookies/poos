@@ -1,16 +1,15 @@
 [bits 16]
 org 0x7C00
 
-%define KERNEL_LOAD_ADDR 0x00100000
+%define KERNEL_PHYS_BASE 0x00200000
 %define REALMODE_STACK   0x7C00
 %define PMODE_STACK      0x0009FC00
 %define KERNEL_LBA_START 1
 %define KERNEL_SECTORS   256
-%define INITRD_LOAD_ADDR 0x00180000
+%define INITRD_LOAD_ADDR 0x00400000
 %define INITRD_LBA_START 300
-%define INITRD_SECTORS   512
+%define INITRD_SECTORS   1024
 %define BOOTINFO_ADDR    0x9000
-%define E820_ENTRIES_MAX 128
 
 start:
     cli
@@ -19,12 +18,25 @@ start:
     mov es, ax
     mov ss, ax
     mov sp, REALMODE_STACK
-
     mov [boot_drive], dl
 
-    call build_bootinfo
-    call enable_a20
+    ; Load Kernel (128KB) to 0x1000:0000 (0x10000)
+    mov ax, 0x1000
+    mov es, ax
+    xor bx, bx
+    mov eax, KERNEL_LBA_START
+    mov cx, KERNEL_SECTORS
+    call bios_read_sectors
 
+    ; Load Initrd (512KB) to 0x3000:0000 (0x30000)
+    mov ax, 0x3000
+    mov es, ax
+    xor bx, bx
+    mov eax, INITRD_LBA_START
+    mov cx, INITRD_SECTORS
+    call bios_read_sectors
+
+    call enable_a20
     lgdt [gdt_descriptor]
 
     mov eax, cr0
@@ -32,43 +44,52 @@ start:
     mov cr0, eax
     jmp 0x08:protected_mode_entry
 
-build_bootinfo:
-    mov di, BOOTINFO_ADDR
-    mov dword [di + 0], 0x534F4F50
-    mov dword [di + 4], 2
-    mov dword [di + 8], 0
-    mov dword [di + 12], 0
-    mov dword [di + 16], KERNEL_LOAD_ADDR
-    mov dword [di + 20], 0
-    mov dword [di + 24], INITRD_LOAD_ADDR
-    mov dword [di + 28], (INITRD_SECTORS * 512)
+bios_read_sectors:
+    pushad
+.loop:
+    push cx
+    push eax
+    ; LBA to CHS (63 SPT, 16 Heads)
+    mov ecx, 1008 ; 63 * 16
+    xor edx, edx
+    div ecx ; EAX=C, EDX=LBA%(H*S)
+    mov ch, al
+    mov al, ah
+    shl al, 6
+    mov ah, al
+    mov eax, edx
+    mov ecx, 63
+    xor edx, edx
+    div ecx ; EAX=H, EDX=S-1
+    mov dh, al
+    mov cl, dl
+    inc cl
+    or cl, ah
+    mov ax, 0x0201 ; Read 1 sector
+    mov dl, [boot_drive]
+    int 0x13
+    jc .error
+    pop eax
+    inc eax
+    pop cx
+    add bx, 512
+    jnz .no_inc_es
+    mov ax, es
+    add ax, 0x1000
+    mov es, ax
+.no_inc_es:
+    loop .loop
+    popad
+    ret
+.error:
+    mov al, 'E'
+    out 0xE9, al
+    jmp $
 
-    mov di, BOOTINFO_ADDR + 32
-    xor ebx, ebx
-    xor bp, bp
-.e820_loop:
-    mov eax, 0xE820
-    mov edx, 0x534D4150
-    mov ecx, 24
-    int 0x15
-    jc .done
-    cmp eax, 0x534D4150
-    jne .done
-
-    inc bp
-    add di, 24
-    cmp bp, E820_ENTRIES_MAX
-    jae .done
-    test ebx, ebx
-    jnz .e820_loop
-.done:
-    mov dword [BOOTINFO_ADDR + 12], ebp
-    cmp bp, 0
-    je .ret
-    mov eax, [BOOTINFO_ADDR + 8]
-    or eax, 1
-    mov [BOOTINFO_ADDR + 8], eax
-.ret:
+enable_a20:
+    in al, 0x92
+    or al, 0x02
+    out 0x92, al
     ret
 
 [bits 32]
@@ -81,111 +102,33 @@ protected_mode_entry:
     mov ss, ax
     mov esp, PMODE_STACK
 
-    mov dl, [boot_drive]
-    mov eax, KERNEL_LBA_START
-    mov ecx, KERNEL_SECTORS
-    mov edi, KERNEL_LOAD_ADDR
-    call ata_lba_read
+    ; Move Kernel to 2MB
+    mov esi, 0x10000
+    mov edi, KERNEL_PHYS_BASE
+    mov ecx, (KERNEL_SECTORS * 512 / 4)
+    rep movsd
 
-    mov dl, [boot_drive]
-    mov eax, INITRD_LBA_START
-    mov ecx, INITRD_SECTORS
+    ; Move Initrd to 4MB
+    mov esi, 0x30000
     mov edi, INITRD_LOAD_ADDR
-    call ata_lba_read
+    mov ecx, (INITRD_SECTORS * 512 / 4)
+    rep movsd
+
+    ; Update BOOTINFO
+    mov di, BOOTINFO_ADDR
+    mov dword [di + 0], 0x534F4F50
+    mov dword [di + 4], 2
+    mov dword [di + 8], 0
+    mov dword [di + 12], 0
+    mov dword [di + 16], KERNEL_PHYS_BASE
+    mov dword [di + 20], 0
+    mov dword [di + 24], INITRD_LOAD_ADDR
+    mov dword [di + 28], (INITRD_SECTORS * 512)
 
     mov eax, BOOTINFO_ADDR
-    jmp 0x08:KERNEL_LOAD_ADDR
-
-hang:
-    cli
-    hlt
-    jmp hang
-
-enable_a20:
-    in al, 0x92
-    test al, 0x02
-    jnz .done
-    or al, 0x02
-    and al, 0xFE
-    out 0x92, al
-.done:
-    ret
-
-ata_lba_read:
-    pushad
-.next_sector:
-    test ecx, ecx
-    jz .done
-    call ata_wait_not_busy
-
-    mov dx, 0x1F2
-    mov al, 1
-    out dx, al
-
-    mov edx, eax
-    mov dx, 0x1F3
-    mov al, dl
-    out dx, al
-
-    mov dx, 0x1F4
-    mov al, dh
-    out dx, al
-
-    shr edx, 16
-    mov dx, 0x1F5
-    mov al, dl
-    out dx, al
-
-    mov dx, 0x1F6
-    mov al, 0xE0
-    or al, dh
-    out dx, al
-
-    mov dx, 0x1F7
-    mov al, 0x20
-    out dx, al
-
-    call ata_wait_drq
-
-    mov dx, 0x1F0
-    mov ebx, 256
-.read_word:
-    in ax, dx
-    mov [edi], ax
-    add edi, 2
-    dec ebx
-    jnz .read_word
-
-    inc eax
-    dec ecx
-    jmp .next_sector
-.done:
-    popad
-    ret
-
-ata_wait_not_busy:
-    mov dx, 0x1F7
-.wait1:
-    in al, dx
-    test al, 0x80
-    jnz .wait1
-    ret
-
-ata_wait_drq:
-    mov dx, 0x1F7
-.wait2:
-    in al, dx
-    test al, 0x08
-    jnz .ready
-    test al, 0x01
-    jnz hang
-    jmp .wait2
-.ready:
-    ret
+    jmp 0x08:KERNEL_PHYS_BASE
 
 %include "boot/gdt.asm"
-
 boot_drive: db 0
-
 times 510 - ($ - $$) db 0
 dw 0xAA55

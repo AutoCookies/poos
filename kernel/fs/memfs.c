@@ -18,8 +18,16 @@ static int mdir_lookup(struct vnode* dir,const char* name,struct vnode** out){ (
 static int mdir_readdir(struct vnode* vn,u32* cookie,struct vdirent* out){ (void)vn; u32 seen=0; for(u32 i=0;i<MEMFS_MAX_FILES;i++) if(g_files[i].used){ if(seen++<*cookie) continue; mem_copy(out->name,g_files[i].name,32); out->name[31]=0; out->type=VNODE_REG; *cookie=seen; return 1; } return 0; }
 static int mdir_getattr(struct vnode* vn,struct vstat* out){ (void)vn; out->type=VNODE_DIR; out->mode=vn->mode; out->uid=vn->uid; out->gid=vn->gid; out->size=0; return 0; }
 
-static const struct vnode_ops g_file_ops={0,mf_read,mf_write,0,mf_getattr};
-static const struct vnode_ops g_dir_ops={mdir_lookup,0,0,mdir_readdir,mdir_getattr};
+static const struct vnode_ops g_file_ops={
+    .read = mf_read,
+    .write = mf_write,
+    .getattr = mf_getattr
+};
+static const struct vnode_ops g_dir_ops={
+    .lookup = mdir_lookup,
+    .readdir = mdir_readdir,
+    .getattr = mdir_getattr
+};
 
 struct vnode* memfs_root(void){ vnode_init(&g_root,VNODE_DIR,&g_dir_ops,0); return &g_root; }
 

@@ -65,6 +65,13 @@ int sys_auth(const char* user,const char* pass,int* uid,int* gid);
 #define AF_INET 2
 #define SOCK_STREAM 1
 #define SOCK_DGRAM 2
+#define PROT_READ 0x1
+#define PROT_WRITE 0x2
+#define PROT_EXEC 0x4
+#define MAP_PRIVATE 0x01
+#define MAP_SHARED 0x02
+#define MAP_FIXED 0x10
+#define MAP_ANON 0x20
 
 int sys_getrandom(void* buf, int len, int flags);
 int sys_time(void);

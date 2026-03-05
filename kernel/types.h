@@ -7,6 +7,7 @@ typedef unsigned int       u32;
 typedef unsigned long long u64;
 typedef signed int         i32;
 typedef unsigned int       usize;
+typedef unsigned int       uptr;
 
 enum { false = 0, true = 1 };
 typedef u8 bool;
@@ -14,7 +15,7 @@ typedef u8 bool;
 #define IDT_ENTRIES 256U
 
 /* Memory layout */
-#define KERNEL_PHYS_BASE  0x00100000U
+#define KERNEL_PHYS_BASE  0x00200000U
 #define KERNEL_VIRT_BASE  0xC0000000U
 #define VGA_TEXT_BUFFER   0x000B8000U
 

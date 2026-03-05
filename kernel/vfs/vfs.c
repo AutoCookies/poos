@@ -10,7 +10,9 @@
 
 static int split_parent(const char* path, char* parent, char* name){
     u32 len=0; while(path[len]) len++; if(len<2||path[0]!='/') return -1;
-    while(len>1 && path[len-1]=='/') len--; u32 i=len; while(i>1 && path[i-1]!='/') i--; if(i==0||i>=len) return -1;
+    while(len>1 && path[len-1]=='/') len--;
+    u32 i=len; while(i>1 && path[i-1]!='/') i--;
+    if(i==0||i>=len) return -1;
     u32 pn=i; if(pn==0) pn=1; for(u32 j=0;j<pn;j++) parent[j]=path[j]; parent[pn]=0;
     u32 n=0; for(u32 j=i;j<len && n<63;j++) name[n++]=path[j]; name[n]=0; return 0;
 }

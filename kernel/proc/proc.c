@@ -85,7 +85,7 @@ struct proc* proc_create(const char* name, struct proc* parent) {
     if (p->cgrp) { cgroup_get(p->cgrp); cgroup_join(p->cgrp, p); }
     p->seccomp = (struct seccomp_filter*)kmalloc(sizeof(struct seccomp_filter), 8);
     if (p->seccomp) {
-        if (parent && parent->seccomp) mem_cpy(p->seccomp, parent->seccomp, sizeof(struct seccomp_filter));
+        if (parent && parent->seccomp) mem_copy(p->seccomp, parent->seccomp, sizeof(struct seccomp_filter));
         else seccomp_init_filter(p->seccomp, SECCOMP_MODE_DISABLED);
     }
     p->next = g_procs; g_procs = p;
